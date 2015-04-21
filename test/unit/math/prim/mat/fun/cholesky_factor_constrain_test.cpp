@@ -1,11 +1,13 @@
-#include <stan/math/prim/mat.hpp>
+#include <stan/math/prim/mat/fun/cholesky_factor_constrain.hpp>
+#include <stan/math/prim/mat/fun/cholesky_factor_free.hpp>
 #include <test/unit/util.hpp>
+
 #include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(ProbTransform,choleskyFactor) {
+TEST(MathPrim, choleskyFactor) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
   using stan::math::cholesky_factor_constrain;
@@ -26,7 +28,7 @@ TEST(ProbTransform,choleskyFactor) {
   for (int i = 0; i < 3; ++i)
     EXPECT_FLOAT_EQ(x(i), x2(i));
 }
-TEST(ProbTransform,choleskyFactorLogJacobian) {
+TEST(MathPrim, choleskyFactorLogJacobian) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
   using stan::math::cholesky_factor_constrain;
@@ -68,34 +70,14 @@ TEST(ProbTransform,choleskyFactorLogJacobian) {
   EXPECT_FLOAT_EQ(1.2 + 1.001 + 3.01 + 6.1, lp);
 
 }
-TEST(ProbTransform,choleskyFactorConstrainError) {
+TEST(MathPrim, choleskyFactorConstrainError) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
   using stan::math::cholesky_factor_constrain;
 
   Matrix<double,Dynamic,1> x(3);
   x << 1, 2, 3;
-  EXPECT_THROW(cholesky_factor_constrain(x,9,9), std::invalid_argument);
+  EXPECT_THROW(cholesky_factor_constrain(x,9,9),std::domain_error);
   double lp = 0;
-  EXPECT_THROW(cholesky_factor_constrain(x,9,9,lp), std::invalid_argument);
+  EXPECT_THROW(cholesky_factor_constrain(x,9,9,lp),std::domain_error);
 }
-TEST(ProbTransform,choleskyFactorFreeError) {
-  using Eigen::Matrix;
-  using Eigen::Dynamic;
-  using stan::math::cholesky_factor_free;
-
-  Matrix<double,Dynamic,Dynamic> y(1,1);
-  y.resize(1,1);
-  y << -2;
-  EXPECT_THROW(cholesky_factor_free(y), std::domain_error);
-
-  y.resize(2,2);
-  y << 1, 2, 3, 4;
-  EXPECT_THROW(cholesky_factor_free(y), std::domain_error);
-
-  y.resize(2,3);
-  y << 1, 0, 0,
-    2, 3, 0;
-  EXPECT_THROW(cholesky_factor_free(y), std::domain_error);
-}
-

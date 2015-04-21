@@ -1,12 +1,12 @@
-#include <stan/math/prim/scal.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/scal/fun/prob_constrain.hpp>
+#include <stan/math/prim/scal/fun/prob_free.hpp>
 #include <gtest/gtest.h>
 
-TEST(prob_transform, prob) {
+TEST(MathPrim, prob_constrain) {
   EXPECT_FLOAT_EQ(stan::math::inv_logit(-1.0), 
                   stan::math::prob_constrain(-1.0));
 }
-TEST(prob_transform, prob_j) {
+TEST(MathPrim, prob_constrain_j) {
   double lp = -17.0;
   double L = 0.0;
   double U = 1.0;
@@ -17,18 +17,8 @@ TEST(prob_transform, prob_j) {
                   + log(1.0 - stan::math::inv_logit(x)),
                   lp);
 }
-TEST(prob_transform, prob_f) {
-  double L = 0.0;
-  double U = 1.0;
-  double y = 0.4;
-  EXPECT_FLOAT_EQ(stan::math::logit((y - L) / (U - L)),
-                  stan::math::prob_free(y));
-}
-TEST(prob_transform, prob_f_exception) {
-  EXPECT_THROW (stan::math::prob_free(1.1), std::domain_error);
-  EXPECT_THROW (stan::math::prob_free(-0.1), std::domain_error);
-}
-TEST(prob_transform, prob_rt) {
+
+TEST(MathPrim, prob_rt) {
   double x = -1.0;
   double xc = stan::math::prob_constrain(x);
   double xcf = stan::math::prob_free(xc);

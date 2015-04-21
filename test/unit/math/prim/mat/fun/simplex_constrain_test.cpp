@@ -1,11 +1,11 @@
-#include <stan/math/prim/mat.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/mat/fun/simplex_constrain.hpp>
+#include <stan/math/prim/mat/fun/simplex_free.hpp>
 #include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(prob_transform,simplex_rt0) {
+TEST(MathPrim, simplex_rt0) {
   Matrix<double,Dynamic,1> x(4);
   x << 0.0, 0.0, 0.0, 0.0;
   Matrix<double,Dynamic,1> y = stan::math::simplex_constrain(x);
@@ -22,7 +22,7 @@ TEST(prob_transform,simplex_rt0) {
     EXPECT_NEAR(x[i],xrt[i],1E-10);
   }
 }
-TEST(prob_transform,simplex_rt) {
+TEST(MathPrim, simplex_rt) {
   Matrix<double,Dynamic,1> x(3);
   x << 1.0, -1.0, 2.0;
   Matrix<double,Dynamic,1> y = stan::math::simplex_constrain(x);
@@ -33,7 +33,7 @@ TEST(prob_transform,simplex_rt) {
     EXPECT_FLOAT_EQ(x[i],xrt[i]);
   }
 }
-TEST(prob_transform,simplex_match) {
+TEST(MathPrim, simplex_match) {
   Matrix<double,Dynamic,1> x(3);
   x << 1.0, -1.0, 2.0;
   double lp;
@@ -44,11 +44,4 @@ TEST(prob_transform,simplex_match) {
   EXPECT_EQ(4,y2.size());
   for (int i = 0; i < x.size(); ++i)
     EXPECT_FLOAT_EQ(y[i],y2[i]);
-}
-TEST(prob_transform,simplex_f_exception) {
-  Matrix<double,Dynamic,1> y(2);
-  y << 0.5, 0.55;
-  EXPECT_THROW(stan::math::simplex_free(y), std::domain_error);
-  y << 1.1, -0.1;
-  EXPECT_THROW(stan::math::simplex_free(y), std::domain_error);
 }

@@ -1,11 +1,11 @@
-#include <stan/math/prim/mat.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/mat/fun/positive_ordered_constrain.hpp>
+#include <stan/math/prim/mat/fun/positive_ordered_free.hpp>
 #include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(prob_transform,positive_ordered) {
+TEST(MathPrim, positive_ordered_constrain) {
   Matrix<double,Dynamic,1> x(3);
   x << -15.0, -2.0, -5.0;
   Matrix<double,Dynamic,1> y = stan::math::positive_ordered_constrain(x);
@@ -14,7 +14,7 @@ TEST(prob_transform,positive_ordered) {
   EXPECT_EQ(exp(-15.0) + exp(-2.0), y[1]);
   EXPECT_EQ(exp(-15.0) + exp(-2.0) + exp(-5.0), y[2]);
 }
-TEST(prob_transform,positive_ordered_j) {
+TEST(MathPrim, positive_ordered_constrain_j) {
   Matrix<double,Dynamic,1> x(3);
   x << 1.0, -2.0, -5.0;
   double lp = -152.1;
@@ -25,25 +25,7 @@ TEST(prob_transform,positive_ordered_j) {
   EXPECT_EQ(exp(1.0) + exp(-2.0) + exp(-5.0), y[2]);
   EXPECT_EQ(-152.1 + 1.0 - 2.0 - 5.0,lp);
 }
-TEST(prob_transform,positive_ordered_f) {
-  Matrix<double,Dynamic,1> y(3);
-  y << 0.12, 1.1, 172.1;
-  Matrix<double,Dynamic,1> x = stan::math::positive_ordered_free(y);
-  EXPECT_EQ(y.size(),x.size());
-  EXPECT_FLOAT_EQ(log(0.12), x[0]);
-  EXPECT_FLOAT_EQ(log(1.1 - 0.12), x[1]);
-  EXPECT_FLOAT_EQ(log(172.1 - 1.1), x[2]);
-}
-TEST(prob_transform,positive_ordered_f_exception) {
-  Matrix<double,Dynamic,1> y(3);
-  y << -0.1, 0.0, 1.0;
-  EXPECT_THROW(stan::math::positive_ordered_free(y), std::domain_error);
-  y << 0.0, 0.0, 0.0;
-  EXPECT_THROW(stan::math::positive_ordered_free(y), std::domain_error);
-  y << 0.0, 1, 0.9;
-  EXPECT_THROW(stan::math::positive_ordered_free(y), std::domain_error);
-}
-TEST(prob_transform,positive_ordered_rt) {
+TEST(MathPrim, positive_ordered_rt) {
   Matrix<double,Dynamic,1> x(3);
   x << -1.0, 8.0, -3.9;
   Matrix<double,Dynamic,1> y = stan::math::positive_ordered_constrain(x);

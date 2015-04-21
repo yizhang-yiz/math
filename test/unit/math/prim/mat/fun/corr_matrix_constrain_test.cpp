@@ -1,11 +1,11 @@
-#include <stan/math/prim/mat.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/mat/fun/corr_matrix_constrain.hpp>
+#include <stan/math/prim/mat/fun/corr_matrix_free.hpp>
 #include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(prob_transform,corr_matrix_j) {
+TEST(MathPrim, corr_matrix_j) {
   size_t K = 4;
   size_t K_choose_2 = 6; 
   Matrix<double,Dynamic,1> x(K_choose_2);
@@ -18,7 +18,7 @@ TEST(prob_transform,corr_matrix_j) {
     EXPECT_FLOAT_EQ(x[i], xrt[i]);
   }
 }
-TEST(prob_transform,corr_matrix_j2x2) {
+TEST(MathPrim, corr_matrix_j2x2) {
   // tests K=2 boundary case, which has a different implementation
   size_t K = 2;
   size_t K_choose_2 = 1; 
@@ -33,7 +33,7 @@ TEST(prob_transform,corr_matrix_j2x2) {
   }
 }
 
-TEST(prob_transform,corr_matrix_constrain_exception) {
+TEST(MathPrim, corr_matrix_constrain_exception) {
   unsigned int K = 4;
   unsigned int K_choose_2 = 6; 
   Matrix<double,Dynamic,1> x(K_choose_2-1);
@@ -46,7 +46,7 @@ TEST(prob_transform,corr_matrix_constrain_exception) {
   EXPECT_THROW(stan::math::corr_matrix_constrain(x, K), std::invalid_argument);
   EXPECT_THROW(stan::math::corr_matrix_constrain(x, K, lp), std::invalid_argument);
 }
-TEST(prob_transform,corr_matrix_rt) {
+TEST(MathPrim, corr_matrix_rt) {
   unsigned int K = 4;
   unsigned int K_choose_2 = 6; 
   Matrix<double,Dynamic,1> x(K_choose_2);
@@ -58,18 +58,18 @@ TEST(prob_transform,corr_matrix_rt) {
     EXPECT_FLOAT_EQ(x[i], xrt[i]);
   }
 }
-TEST(prob_transform,corr_matrix_free_exception) {
+TEST(MathPrim, corr_matrix_free_exception) {
   Matrix<double,Dynamic,Dynamic> y;
-
-  EXPECT_THROW(stan::math::corr_matrix_free(y), std::invalid_argument);
+  
+  EXPECT_THROW(stan::math::corr_matrix_free(y), std::domain_error);
   y.resize(0,10);
-  EXPECT_THROW(stan::math::corr_matrix_free(y), std::invalid_argument);
+  EXPECT_THROW(stan::math::corr_matrix_free(y), std::domain_error);
   y.resize(10,0);
-  EXPECT_THROW(stan::math::corr_matrix_free(y), std::invalid_argument);
+  EXPECT_THROW(stan::math::corr_matrix_free(y), std::domain_error);
   y.resize(1,2);
-  EXPECT_THROW(stan::math::corr_matrix_free(y), std::invalid_argument);
+  EXPECT_THROW(stan::math::corr_matrix_free(y), std::domain_error);
 
   y.resize(2,2);
   y << 0, 0, 0, 0;
-  EXPECT_THROW(stan::math::corr_matrix_free(y), std::domain_error);
+  EXPECT_THROW(stan::math::corr_matrix_free(y), std::runtime_error);
 }

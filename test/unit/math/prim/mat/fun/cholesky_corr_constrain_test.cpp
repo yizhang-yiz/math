@@ -1,11 +1,12 @@
-#include <stan/math/prim/mat.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/mat/fun/cholesky_corr_constrain.hpp>
+#include <stan/math/prim/mat/fun/cholesky_corr_free.hpp>
 #include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(ProbTransform,CholeskyCorrelation4) {
+
+TEST(MathPrim, CholeskyCorrelation4) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
   Matrix<double,Dynamic,Dynamic> L(4,4);
@@ -79,7 +80,7 @@ test_cholesky_correlation_values(const Eigen::Matrix<double,Eigen::Dynamic,Eigen
       EXPECT_FLOAT_EQ(L(m,n), x2(m,n));
 }
 
-TEST(ProbTransform,CholeskyCorrelationRoundTrips) {
+TEST(MathPrim, CholeskyCorrelationRoundTrips) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
 

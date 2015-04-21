@@ -1,8 +1,10 @@
-#include <stan/math/prim/mat.hpp>
-#include <test/unit/util.hpp>
+#include <stan/math/prim/mat/fun/factor_cov_matrix.hpp>
 #include <gtest/gtest.h>
 
-TEST(probTransform, factorCovMatrix) {
+using Eigen::Matrix;
+using Eigen::Dynamic;
+
+TEST(MathPrim, factorCovMatrix) {
   using Eigen::Matrix;
   using Eigen::Dynamic;
   using Eigen::Array;
