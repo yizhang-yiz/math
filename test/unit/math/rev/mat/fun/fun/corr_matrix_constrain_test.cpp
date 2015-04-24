@@ -1,12 +1,19 @@
-#include <stan/math/rev/mat.hpp>
-#include <gtest/gtest.h>
+#include <stan/math/rev/core.hpp>
+#include <stan/math/rev/scal/fun/fabs.hpp>
+#include <stan/math/rev/scal/fun/log.hpp>
+#include <stan/math/rev/scal/fun/sqrt.hpp>
+#include <stan/math/rev/scal/fun/tanh.hpp>
+#include <stan/math/rev/mat/fun/multiply_lower_tri_self_transpose.hpp>
+#include <stan/math/rev/mat/fun/sum.hpp>
+#include <stan/math/prim/mat/fun/determinant.hpp>
+#include <stan/math/prim/mat/fun/corr_matrix_constrain.hpp>
 #include <test/unit/math/rev/mat/fun/jacobian.hpp>
-#include <test/unit/math/rev/mat/util.hpp>
+#include <gtest/gtest.h>
 
 using Eigen::Matrix;
 using Eigen::Dynamic;
 
-TEST(prob_transform,corr_matrix_jacobian) {
+TEST(MathRev, corr_matrix_constrain_jacobian) {
   using stan::math::var;
   using stan::math::determinant;
   using std::log;
@@ -38,12 +45,4 @@ TEST(prob_transform,corr_matrix_jacobian) {
   double log_abs_jacobian_det = log(fabs(determinant(J)));
   EXPECT_FLOAT_EQ(log_abs_jacobian_det,lp.val());
 }
-TEST(AgradRevMatrix, check_varis_on_stack) {
-  int K = 4;
-  int K_choose_2 = 6;
-  Eigen::Matrix<stan::math::var,Eigen::Dynamic,1> X(K_choose_2);
-  X << 1.0, 2.0, -3.0, 1.7, 9.8, -1.2;
-  stan::math::var lp = 0.0;
-  test::check_varis_on_stack(stan::math::corr_matrix_constrain(X, K, lp));
-  test::check_varis_on_stack(stan::math::corr_matrix_constrain(X, K));
-}
+
