@@ -2,22 +2,34 @@
 #define STAN_MATH_PRIM_MAT_FUN_TO_MATRIX_HPP
 
 #include <stan/math/prim/mat/fun/Eigen.hpp>
- // stan::scalar_type
 #include <vector>
 
 namespace stan {
   namespace math {
 
-    // matrix to_matrix(matrix)
-    // matrix to_matrix(vector)
-    // matrix to_matrix(row_vector)
+    /**
+     * Convert from Eigen::Matrix to Eigen::Matrix.
+     *
+     * This function makes a copy.
+     *
+     * @param[in] matrix matrix to convert
+     * @return matrix
+     */
     template <typename T, int R, int C>
     inline Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
     to_matrix(Eigen::Matrix<T, R, C> matrix) {
       return matrix;
     }
 
-    // matrix to_matrix(real[, ])
+    /**
+     * Convert from std::vector<std::vector<T> > to Eigen::Matrix.
+     *
+     * @param[in] vec vector of vectors. Each inside vector
+     *   must contain a scalar type and each inside vector must
+     *   be the same size.
+     * @return a matrix where each inside vector is a row of the
+     *   matrix with the same scalar type
+     */
     template <typename T>
     inline Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
     to_matrix(const std::vector< std::vector<T> > & vec) {
@@ -31,13 +43,20 @@ namespace stan {
             datap[ij] = vec[j][i];
         return result;
       } else {
-        return Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> (0, 0);
+        return Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(0, 0);
       }
     }
 
-    // matrix to_matrix(int[, ])
+    /**
+     * Convert from std::vector<std::vector<int> > to Eigen::Matrix.
+     *
+     * @param[in] vec vector of vectors of ints. Each inside vector
+     *   must be the same size.
+     * @return a matrix of double where each inside vector is a row
+     *   of the matrix
+     */
     inline Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>
-    to_matrix(const std::vector< std::vector<int> > & vec) {
+    to_matrix(const std::vector< std::vector<int> >& vec) {
       size_t R = vec.size();
       if (R != 0) {
         size_t C = vec[0].size();
