@@ -84,10 +84,10 @@ namespace stan {
       typedef typename boost::math::tools::promote_args <T0, T1>::type scalar;
       using std::vector;
 
-      int nx = x.size();
-      vector<scalar> yout(nx);
+      int nxout = xout.size();
+      vector<scalar> yout(nxout);
 
-      for(int i = 0; i < nx; i++){
+      for(int i = 0; i < nxout; i++){
 	yout[i] = linear_interpolation1(xout[i], x, y);
       }
       return yout;
