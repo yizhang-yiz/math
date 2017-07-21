@@ -2,6 +2,7 @@
 #define STAN_MATH_PRIM_ARR_FUN_LINEAR_INTERPOLATION_HPP
 
 #include <vector>
+#include <algorithm>
 
 namespace stan {
   namespace math {
@@ -30,69 +31,82 @@ namespace stan {
       real_limit = min(numltm, v.size());
       last = real_limit - 1;
 
-      if (srchNum < v[first]) mid = first;
-      else
-	if (srchNum >= v[last]) {
-	  mid = last + 1;
-	} else {
-	  while (first <= last) {
-	    mid = (first + last) / 2;
-	    if (srchNum < v[mid]) last = mid - 1;
-	    else if (srchNum > v[mid]) first = mid + 1;
-	    else
-	      first = last + 1;
-	  }
+      if (srchNum < v[first]) {
+        mid = first;
+      } else {
+        if (srchNum >= v[last]) {
+          mid = last + 1;
+        } else {
+          while (first <= last) {
+            mid = (first + last) / 2;
+            if (srchNum < v[mid]) last = mid - 1;
+            else if (srchNum > v[mid]) first = mid + 1;
+            else
+              first = last + 1;
+          }
+        }
 
-	  while (srchNum >= v[mid]) mid += 1;
-	}
+          while (srchNum >= v[mid]) mid += 1;
+        }
       return mid;
     }
 
     inline int min(int a, int b) {
       if (a < b) return a;
       else
-	return b;
+        return b;
     }
 
     template <typename T0, typename T1>
     typename boost::math::tools::promote_args <T0, T1>::type
-    linear_interpolation1(const T0& xout,
-			  const std::vector<double>& x,
-			  const std::vector<T1>& y){
+    linear_interpolation(const T0& xout,
+                         const std::vector<double>& x,
+                         const std::vector<T1>& y) {
       typedef typename boost::math::tools::promote_args <T0, T1>::type scalar;
       using std::vector;
       int nx = x.size();
       scalar yout;
 
-      if(xout <= x[0]){
-	yout = y[0];
-      }else if(xout >= x[nx - 1]){
-	yout = y[nx - 1];
-      }else{
-	int i = SearchReal(x, nx, xout) - 1;
-	yout = y[i] + (y[i+1] - y[i]) / (x[i+1] - x[i]) * (xout - x[i]);
+      check_finite("linear_interpolation", "xout", xout);
+      check_finite("linear_interpolation", "x", x);
+      check_finite("linear_interpolation", "y", y);
+      check_nonzero_size("linear_interpolation", "x", x);
+      check_nonzero_size("linear_interpolation", "y", y);
+      check_ordered("linear_interpolation", "x", x);
+      check_matching_sizes("linear_interpolation", "x", x, "y", y);
+
+      if (xout <= x[0]) {
+        yout = y[0];
+      } else if (xout >= x[nx - 1]) {
+        yout = y[nx - 1];
+      } else {
+        int i = SearchReal(x, nx, xout) - 1;
+        yout = y[i] + (y[i+1] - y[i]) / (x[i+1] - x[i]) * (xout - x[i]);
       }
 
       return yout;
     }
-    
+
     template <typename T0, typename T1>
     std::vector <typename boost::math::tools::promote_args <T0, T1>::type>
     linear_interpolation(const std::vector<T0>& xout,
-			 const std::vector<double>& x,
-			 const std::vector<T1>& y){
+                         const std::vector<double>& x,
+                         const std::vector<T1>& y) {
       typedef typename boost::math::tools::promote_args <T0, T1>::type scalar;
       using std::vector;
 
       int nxout = xout.size();
       vector<scalar> yout(nxout);
 
-      for(int i = 0; i < nxout; i++){
-	yout[i] = linear_interpolation1(xout[i], x, y);
+      check_nonzero_size("linear_interpolation", "xout", xout);
+      check_finite("linear_interpolation", "xout", xout);
+
+      for (int i = 0; i < nxout; i++) {
+        yout[i] = linear_interpolation(xout[i], x, y);
       }
       return yout;
     }
-   
+
   }
 }
 #endif
