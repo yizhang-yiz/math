@@ -1,61 +1,24 @@
 #ifndef STAN_MATH_PRIM_ARR_FUN_LINEAR_INTERPOLATION_HPP
 #define STAN_MATH_PRIM_ARR_FUN_LINEAR_INTERPOLATION_HPP
 
+#include <stan/math/prim/arr/fun/SearchReal.hpp>
 #include <vector>
 #include <algorithm>
 
 namespace stan {
   namespace math {
 
-    int min(int a, int b);  // forward declare
-
     /**
-     * Returns the position of the largest value smaller or greater than srchNum
-     * Assumes that v is sorted.
-     * The numltm is used to set an upper limit for the index
-     * the function can return. If numltm is greater than the size of v,
-     * there is no upper limit and the function searches the entire vector.
+     * Return the values of a piecewise linear function at specifed values of the 
+     * function argument. The function is specified in terms of a set of x y pairs.
      *
-     * @tparam: type of scalar in input vector
-     * @param[in]: v searched vector
-     * @param[in]: numltm maximum index
-     * @param[in]: srchNum searched Number
-     * @return: index of largest value <= srchNum
-     *
+     * @tparam T0 Type of elements contained in xout array.
+     * @tparam T1 Type of elements contained in y array.
+     * @param xout Scalar or array of function argument values.
+     * @param x Double array of x values. Must be in increasing order.
+     * @param x Array of y values. Must have same length as x.
+     * @return Scalar or array of function values.
      */
-    template<typename T>
-    inline int SearchReal(std::vector<T> v, int numltm, T srchNum) {
-      int first = 0, last, mid, real_limit;
-
-      // limit cannot exceed size of searched vector
-      real_limit = min(numltm, v.size());
-      last = real_limit - 1;
-
-      if (srchNum < v[first]) {
-        mid = first;
-      } else {
-        if (srchNum >= v[last]) {
-          mid = last + 1;
-        } else {
-          while (first <= last) {
-            mid = (first + last) / 2;
-            if (srchNum < v[mid]) last = mid - 1;
-            else if (srchNum > v[mid]) first = mid + 1;
-            else
-              first = last + 1;
-          }
-        }
-
-          while (srchNum >= v[mid]) mid += 1;
-        }
-      return mid;
-    }
-
-    inline int min(int a, int b) {
-      if (a < b) return a;
-      else
-        return b;
-    }
 
     template <typename T0, typename T1>
     typename boost::math::tools::promote_args <T0, T1>::type
