@@ -15,7 +15,7 @@ namespace stan {
      * @tparam T0 Type of elements contained in xout array.
      * @tparam T1 Type of elements contained in y array.
      * @param xout Scalar or array of function argument values.
-     * @param x Double array of x values. Must be in increasing order.
+     * @param x Array of x values. Must be in increasing order.
      * @param y Array of y values. Must have same length as x.
      * @return Scalar or array of function values.
      */
