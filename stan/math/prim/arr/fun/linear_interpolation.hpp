@@ -25,7 +25,8 @@ namespace stan {
     linear_interpolation(const T0& xout,
                          const std::vector<T1>& x,
                          const std::vector<T2>& y) {
-      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type scalar;
+      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type
+        scalar;
       using std::vector;
       int nx = x.size();
       scalar yout;
@@ -55,7 +56,8 @@ namespace stan {
     linear_interpolation(const std::vector<T0>& xout,
                          const std::vector<T1>& x,
                          const std::vector<T2>& y) {
-      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type scalar;
+      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type
+        scalar;
       using std::vector;
 
       int nxout = xout.size();
