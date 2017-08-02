@@ -20,12 +20,12 @@ namespace stan {
      * @return Scalar or array of function values.
      */
 
-    template <typename T0, typename T1, typename T2>
-    typename boost::math::tools::promote_args <T0, T1, T2>::type
+    template <typename T0, typename T1>
+    typename boost::math::tools::promote_args <T0, T1>::type
     linear_interpolation(const T0& xout,
-                         const std::vector<T1>& x,
-                         const std::vector<T2>& y) {
-      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type scalar;
+                         const std::vector<double>& x,
+                         const std::vector<T1>& y) {
+      typedef typename boost::math::tools::promote_args <T0, T1>::type scalar;
       using std::vector;
       int nx = x.size();
       scalar yout;
@@ -50,12 +50,12 @@ namespace stan {
       return yout;
     }
 
-    template <typename T0, typename T1, typename T2>
-    std::vector <typename boost::math::tools::promote_args <T0, T1, T2>::type>
+    template <typename T0, typename T1>
+    std::vector <typename boost::math::tools::promote_args <T0, T1>::type>
     linear_interpolation(const std::vector<T0>& xout,
-                         const std::vector<T1>& x,
-                         const std::vector<T2>& y) {
-      typedef typename boost::math::tools::promote_args <T0, T1, T2>::type scalar;
+                         const std::vector<double>& x,
+                         const std::vector<T1>& y) {
+      typedef typename boost::math::tools::promote_args <T0, T1>::type scalar;
       using std::vector;
 
       int nxout = xout.size();

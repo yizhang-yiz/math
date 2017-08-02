@@ -33,120 +33,38 @@ TEST(linear_interpolation, linear_example) {
   }
 }
 
-TEST(linear_interpolation, xgradient){
+TEST(linear_interpolation, gradient){
   using stan::math::var;
   int nx = 5, nout = 3;
-  std::vector<double> xdbl(nx), ydbl(nx), xoutdbl(nout), thisGrad(nx);
+  std::vector<double> x(nx), xout(nout), thisGrad(nx);
   Eigen::MatrixXd trueJac = Eigen::MatrixXd::Zero(3, 5); 
 
   for(int i = 0; i < nx; i++){
-    xdbl[i] = i;
-    ydbl[i] = i;
+    x[i] = i;
   }
 
-  xoutdbl[0] = 1.5;
-  xoutdbl[1] = 2.5;
-  xoutdbl[2] = 4.5;
+  xout[0] = 1.5;
+  xout[1] = 2.5;
+  xout[2] = 4.5;
 
-  trueJac(0, 1) = (ydbl[2] - ydbl[1]) * (xoutdbl[0] - xdbl[2]) / pow(xdbl[2] - xdbl[1], 2);
-  trueJac(0, 2) = -(ydbl[2] - ydbl[1]) * (xoutdbl[0] - xdbl[1]) / pow(xdbl[2] - xdbl[1], 2);
-
-  trueJac(1, 2) = (ydbl[3] - ydbl[2]) * (xoutdbl[1] - xdbl[3]) / pow(xdbl[3] - xdbl[2], 2);
-  trueJac(1, 3) = -(ydbl[3] - ydbl[2]) * (xoutdbl[1] - xdbl[2]) / pow(xdbl[3] - xdbl[2], 2);
-
-  for(int i = 0; i < nout; i++){
-    std::vector<var> x(nx), y(nx), xout(nout), yout;
-    for(int k = 0; k < nx; k++){
-      x[k] = k;
-      y[k] = k;
-    }
-    for(int k = 0; k < nout; k++){
-      xout[k] = xoutdbl[k];
-    }
-    yout = stan::math::linear_interpolation(xout, x, y);
-
-    yout[i].grad(x, thisGrad);
-
-    for(int j = 0; j < nx; j++){
-      EXPECT_EQ(trueJac(i, j), thisGrad[j]);
-    }
-  }
-}
-
-TEST(linear_interpolation, ygradient){
-  using stan::math::var;
-  int nx = 5, nout = 3;
-  std::vector<double> xdbl(nx), ydbl(nx), xoutdbl(nout), thisGrad(nx);
-  Eigen::MatrixXd trueJac = Eigen::MatrixXd::Zero(3, 5); 
-
-  for(int i = 0; i < nx; i++){
-    xdbl[i] = i;
-    ydbl[i] = i;
-  }
-
-  xoutdbl[0] = 1.5;
-  xoutdbl[1] = 2.5;
-  xoutdbl[2] = 4.5;
-
-  trueJac(0, 2) = (xoutdbl[0] - xdbl[1]) / (xdbl[2] - xdbl[1]);
+  trueJac(0, 2) = (xout[0] - x[1]) / (x[2] - x[1]);
   trueJac(0, 1) = 1 - trueJac(0, 2);
 
-  trueJac(1, 3) = (xoutdbl[1] - xdbl[2]) / (xdbl[3] - xdbl[2]);
+  trueJac(1, 3) = (xout[1] - x[2]) / (x[3] - x[2]);
   trueJac(1, 2) = 1 - trueJac(1, 3);
 
   trueJac(2, 4) = 1;
 
   for(int i = 0; i < nout; i++){
-    std::vector<var> x(nx), y(nx), xout(nout), yout;
-    for(int k = 0; k < nx; k++){
-      x[k] = k;
-      y[k] = k;
-    }
-    for(int k = 0; k < nout; k++){
-      xout[k] = xoutdbl[k];
+    std::vector<var> y(nx), yout;
+    for(int i = 0; i < nx; i++){
+      y[i] = i;
     }
     yout = stan::math::linear_interpolation(xout, x, y);
 
     yout[i].grad(y, thisGrad);
     
     for(int j = 0; j < nx; j++){
-      EXPECT_EQ(trueJac(i, j), thisGrad[j]);
-    }
-  }
-}
-
-TEST(linear_interpolation, xoutgradient){
-  using stan::math::var;
-  int nx = 5, nout = 3;
-  std::vector<double> xdbl(nx), ydbl(nx), xoutdbl(nout), thisGrad(nx);
-  Eigen::MatrixXd trueJac = Eigen::MatrixXd::Zero(3, 3); 
-
-  for(int i = 0; i < nx; i++){
-    xdbl[i] = i;
-    ydbl[i] = i;
-  }
-
-  xoutdbl[0] = 1.5;
-  xoutdbl[1] = 2.5;
-  xoutdbl[2] = 4.5;
-
-  trueJac(0, 0) = (ydbl[2] - ydbl[1]) / (xdbl[2] - xdbl[1]);
-  trueJac(1, 1) = (ydbl[3] - ydbl[2]) / (xdbl[3] - xdbl[2]);
-
-  for(int i = 0; i < nout; i++){
-    std::vector<var> x(nx), y(nx), xout(nout), yout;
-    for(int k = 0; k < nx; k++){
-      x[k] = k;
-      y[k] = k;
-    }
-    for(int k = 0; k < nout; k++){
-      xout[k] = xoutdbl[k];
-    }
-    yout = stan::math::linear_interpolation(xout, x, y);
-
-    yout[i].grad(xout, thisGrad);
-
-    for(int j = 0; j < nout; j++){
       EXPECT_EQ(trueJac(i, j), thisGrad[j]);
     }
   }
