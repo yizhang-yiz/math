@@ -35,6 +35,9 @@ namespace stan {
       };
     }
 
+    /* an example user functor in Stan could be */
+    // real[] map_rect(F f, real[,] theta, real[,] x_r, int[,] x_i);
+
     template <typename F>
     std::vector<var>
     map_rect_mpi(const F& f,
