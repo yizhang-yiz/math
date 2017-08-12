@@ -1,6 +1,10 @@
+#pragma once
 
 #include <boost/mpi.hpp>
-#include <stan/math/prim/functor/mpi_command.hpp>
+#include <stan/math/prim/arr/functor/mpi_command.hpp>
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/export.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 
 namespace stan {
@@ -11,6 +15,7 @@ namespace stan {
         boost::mpi::communicator world;
         
         if(world.rank() != 0) {
+          std::cout << "Worker " << world.rank() << " waiting for commands..." << std::endl;
           while(1) {
             boost::shared_ptr<mpi_command> work;
             
@@ -39,3 +44,6 @@ namespace stan {
 
   }
 }
+
+BOOST_CLASS_EXPORT(stan::math::stop_worker);
+
