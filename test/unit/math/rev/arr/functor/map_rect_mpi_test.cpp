@@ -17,7 +17,9 @@ struct hard_work {
   }
 };
 
-BOOST_CLASS_EXPORT(stan::math::internal::run_functor<hard_work>);
+//BOOST_CLASS_EXPORT(stan::math::internal::run_functor<hard_work>);
+
+BOOST_CLASS_EXPORT(stan::math::internal::run_distributed_map_rect<hard_work>);
 
 
 int main(int argc, const char* argv[]) {
@@ -49,11 +51,6 @@ int main(int argc, const char* argv[]) {
   hard_work f;
 
   vector<stan::math::var> res = stan::math::map_rect_mpi(f, theta, x_r, x_i);
-  
-  // stop the workers
-  boost::shared_ptr<stan::math::mpi_command> stop_command(new stan::math::stop_worker());
-
-  boost::mpi::broadcast(world, stop_command, 0);
   
   std::cout << "Root process ends." << std::endl;
   

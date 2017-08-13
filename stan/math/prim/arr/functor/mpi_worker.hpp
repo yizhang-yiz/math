@@ -10,23 +10,6 @@
 namespace stan {
   namespace math {
 
-    struct mpi_worker {
-      mpi_worker() {
-        boost::mpi::communicator world;
-        
-        if(world.rank() != 0) {
-          std::cout << "Worker " << world.rank() << " waiting for commands..." << std::endl;
-          while(1) {
-            boost::shared_ptr<mpi_command> work;
-            
-            boost::mpi::broadcast(world, work, 0);
-
-            work->run();
-          }
-        }
-      }
-    };
-
     // MPI command which will shut down a child gracefully
     struct stop_worker : public mpi_command {
       friend class boost::serialization::access;
@@ -39,6 +22,33 @@ namespace stan {
         std::cout << "Terminating worker " << world.rank() << std::endl;
         MPI_Finalize();
         std::exit(0);
+      }
+    };
+
+    struct mpi_worker {
+      boost::mpi::communicator world_;
+      const std::size_t R_ = world_.rank();
+      mpi_worker() {
+        if(R_ != 0) {
+          std::cout << "Worker " << R_ << " waiting for commands..." << std::endl;
+          while(1) {
+            boost::shared_ptr<mpi_command> work;
+            
+            boost::mpi::broadcast(world_, work, 0);
+
+            work->run();
+          }
+        }
+      }
+
+      ~mpi_worker() {
+        // the destructor will ensure that the childs are being
+        // shutdown
+        if(R_ == 0) {
+          boost::shared_ptr<stan::math::mpi_command> stop_command(new stop_worker());
+
+          boost::mpi::broadcast(world_, stop_command, 0);
+        }
       }
     };
 
