@@ -2,6 +2,11 @@
 
 #include <vector>
 
+#include <boost/flyweight.hpp>
+#include <boost/flyweight/key_value.hpp>
+#include <boost/flyweight/set_factory.hpp>
+#include <boost/flyweight/no_tracking.hpp>
+
 #include <stan/math/prim/mat/fun/to_array_1d.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
 
@@ -12,7 +17,130 @@ namespace stan {
     // been send already
     
     namespace internal {
+      
+      // map N chunks to W with a chunks-size of C; used for
+      // deterministic scheduling
+      std::vector<int>
+      map_chunks(std::size_t N, std::size_t W, std::size_t C = 1) {
+        std::vector<int> chunks(W, N / W);
+      
+        for(std::size_t r = 0; r != N % W; r++)
+          ++chunks[r+1];
 
+        for(std::size_t i = 0; i != W; i++)
+          chunks[i] *= C;
+
+        return(chunks);
+      }
+
+
+      struct distributed_map_rect_data {
+        distributed_map_rect_data(std::size_t uid) : uid_(uid) {}
+        //distributed_map_rect_data() : uid_(ref_count_++) {}
+        const std::size_t uid_;
+        std::size_t N_;
+        std::size_t T_;
+        std::size_t X_r_;
+        std::size_t X_i_;
+        std::vector<double> flat_x_r_;
+        std::vector<int> flat_x_i_;
+        //private:
+        //static std::size_t ref_count_;
+      };
+
+      //std::size_t distributed_map_rect_data::ref_count_ = 0;
+
+      struct distributed_map_rect_data_uid_extractor {
+        const std::size_t operator()(const distributed_map_rect_data& x) const
+        {
+          return x.uid_;
+        }
+      };
+
+      typedef boost::flyweights::flyweight<
+        boost::flyweights::key_value<std::size_t,distributed_map_rect_data,distributed_map_rect_data_uid_extractor>,
+        boost::flyweights::no_tracking,
+        boost::flyweights::set_factory<>
+        > distributed_map_rect_flyweight;
+
+
+      // forward declare
+      std::size_t distribute_map_rect_data(std::size_t T,
+                                           const std::vector<std::vector<double> >& x_r,
+                                           const std::vector<std::vector<int> >& x_i);
+      
+      struct mpi_distribute_map_rect_data : public mpi_command {
+        friend class boost::serialization::access;
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int version) {
+          ar & BOOST_SERIALIZATION_BASE_OBJECT_NVP(mpi_command);
+        }
+        void run() const {
+          distribute_map_rect_data(0, std::vector<std::vector<double> >(1), std::vector<std::vector<int> >(1));
+        }
+      };
+
+      std::size_t
+      distribute_map_rect_data(std::size_t T,
+                               const std::vector<std::vector<double> >& x_r,
+                               const std::vector<std::vector<int> >& x_i) {
+        static std::size_t ref_count = 0;
+
+        const std::size_t uid = ref_count++;
+        
+        boost::mpi::communicator world;
+        
+        const std::size_t W = world.size();
+        const std::size_t R = world.rank();
+
+        std::cout << "Job " << R << " registers data..." << std::endl;
+
+        if(R == 0) {
+          // initiate on the root call of this function
+          boost::shared_ptr<mpi_command> work(new mpi_distribute_map_rect_data);
+          boost::mpi::broadcast(world, work, 0);
+        }
+        //if(R != 0)
+        //throw std::runtime_error("only root can distribute data.");
+
+        const std::size_t N = x_r.size();
+        const std::size_t X_r = x_r[0].size();
+        const std::size_t X_i = x_i[0].size();
+
+        std::vector<int> meta = { uid, N, T, X_r, X_i };
+        boost::mpi::broadcast(world, meta.data(), 5, 0);
+
+        distributed_map_rect_data temp(meta[0]);
+
+        temp.N_ = meta[1];
+        temp.T_ = meta[2];
+        temp.X_r_ = meta[3];
+        temp.X_i_ = meta[4];
+                        
+        // flatten data and send out/recieve using scatterv
+        if(temp.X_r_ > 0) {
+            const std::vector<double> world_x_r = to_array_1d(x_r);
+            const std::vector<int> chunks_x_r = map_chunks(temp.N_, W, temp.X_r_);
+            temp.flat_x_r_.resize(chunks_x_r[R]);
+            boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, temp.flat_x_r_.data(), 0);
+            std::cout << "Job " << R << " got " << temp.flat_x_r_.size() << " real data " << std::endl;
+          }
+          if(temp.X_i_ > 0) {
+            const std::vector<int> world_x_i = to_array_1d(x_i);
+            const std::vector<int> chunks_x_i = map_chunks(temp.N_, W, temp.X_i_);
+            temp.flat_x_i_.resize(chunks_x_i[R]);
+            boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, temp.flat_x_i_.data(), 0);
+            std::cout << "Job " << R << " got " << temp.flat_x_i_.size() << " int data " << std::endl;
+          }
+
+        // push to flyweight stack
+        distributed_map_rect_flyweight local(temp);
+
+        std::cout << "Job " << R << " done caching data for uid = " << meta[0] << "." << std::endl;
+        
+        return uid;
+      }
+      
       // forward declaration
       template <typename F> class distributed_map_rect;
 
