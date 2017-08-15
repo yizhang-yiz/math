@@ -26,19 +26,6 @@ int main(int argc, const char* argv[]) {
   boost::mpi::environment env;
   boost::mpi::communicator world;
   using std::vector;
-
-  stan::math::internal::distributed_map_rect_data data3(3);
-  std::cout << "created data3 with uid = " << data3.uid_ << std::endl;
-
-  stan::math::internal::distributed_map_rect_flyweight data4(4);
-
-  std::cout << "created data4 with uid = " << data4.get().uid_ << std::endl;
-
-  data4 = data3;
-  
-  std::cout << "data4 after reassignment = " << data4.get().uid_ << std::endl;
-
-  //std::cout << "created data4 with uid = " << data4.get().uid_ << std::endl;
   
   // on non-root processes this makes the workers listen to commands
   // send from the root
@@ -65,11 +52,16 @@ int main(int argc, const char* argv[]) {
   
   const std::size_t uid = stan::math::internal::distribute_map_rect_data(theta[0].size(), x_r, x_i);
 
-  // TODO: make the actual functor use the distribute thing
   hard_work f;
 
   vector<stan::math::var> res = stan::math::map_rect_mpi(f, theta, x_r, x_i);
   
+  std::cout << "Executing with cached data." << std::endl;
+
+  stan::math::internal::distributed_map_rect<hard_work> root_job_chunk_cache(theta, 1);
+  
+  vector<stan::math::var> res2 = root_job_chunk_cache.register_results();
+
   std::cout << "Root process ends." << std::endl;
   
   return(0);

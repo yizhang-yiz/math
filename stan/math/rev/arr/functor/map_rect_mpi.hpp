@@ -1,11 +1,7 @@
 #pragma once
 
 #include <vector>
-
-#include <boost/flyweight.hpp>
-#include <boost/flyweight/key_value.hpp>
-#include <boost/flyweight/set_factory.hpp>
-#include <boost/flyweight/no_tracking.hpp>
+#include <set>
 
 #include <stan/math/prim/mat/fun/to_array_1d.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
@@ -34,10 +30,11 @@ namespace stan {
       }
 
 
+
       struct distributed_map_rect_data {
         distributed_map_rect_data(std::size_t uid) : uid_(uid) {}
         //distributed_map_rect_data() : uid_(ref_count_++) {}
-        const std::size_t uid_;
+        std::size_t uid_;
         std::size_t N_;
         std::size_t T_;
         std::size_t X_r_;
@@ -48,21 +45,9 @@ namespace stan {
         //static std::size_t ref_count_;
       };
 
+      typedef boost::serialization::singleton<std::map<std::size_t,distributed_map_rect_data> > distributed_data;
+
       //std::size_t distributed_map_rect_data::ref_count_ = 0;
-
-      struct distributed_map_rect_data_uid_extractor {
-        const std::size_t operator()(const distributed_map_rect_data& x) const
-        {
-          return x.uid_;
-        }
-      };
-
-      typedef boost::flyweights::flyweight<
-        boost::flyweights::key_value<std::size_t,distributed_map_rect_data,distributed_map_rect_data_uid_extractor>,
-        boost::flyweights::no_tracking,
-        boost::flyweights::set_factory<>
-        > distributed_map_rect_flyweight;
-
 
       // forward declare
       std::size_t distribute_map_rect_data(std::size_t T,
@@ -117,24 +102,28 @@ namespace stan {
         temp.X_r_ = meta[3];
         temp.X_i_ = meta[4];
                         
+        std::cout << "worker " << R << " / " << W << " registers shapes " << temp.N_ << ", " << temp.T_ << ", " << temp.X_i_ << ", " << temp.X_r_ << std::endl;
+
         // flatten data and send out/recieve using scatterv
         if(temp.X_r_ > 0) {
-            const std::vector<double> world_x_r = to_array_1d(x_r);
-            const std::vector<int> chunks_x_r = map_chunks(temp.N_, W, temp.X_r_);
-            temp.flat_x_r_.resize(chunks_x_r[R]);
-            boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, temp.flat_x_r_.data(), 0);
-            std::cout << "Job " << R << " got " << temp.flat_x_r_.size() << " real data " << std::endl;
-          }
-          if(temp.X_i_ > 0) {
-            const std::vector<int> world_x_i = to_array_1d(x_i);
-            const std::vector<int> chunks_x_i = map_chunks(temp.N_, W, temp.X_i_);
-            temp.flat_x_i_.resize(chunks_x_i[R]);
-            boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, temp.flat_x_i_.data(), 0);
-            std::cout << "Job " << R << " got " << temp.flat_x_i_.size() << " int data " << std::endl;
-          }
+          const std::vector<double> world_x_r = to_array_1d(x_r);
+          const std::vector<int> chunks_x_r = map_chunks(temp.N_, W, temp.X_r_);
+          temp.flat_x_r_.resize(chunks_x_r[R]);
+          boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, temp.flat_x_r_.data(), 0);
+          std::cout << "Job " << R << " got " << temp.flat_x_r_.size() << " real data " << std::endl;
+        }
+        if(temp.X_i_ > 0) {
+          const std::vector<int> world_x_i = to_array_1d(x_i);
+          const std::vector<int> chunks_x_i = map_chunks(temp.N_, W, temp.X_i_);
+          temp.flat_x_i_.resize(chunks_x_i[R]);
+          boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, temp.flat_x_i_.data(), 0);
+          std::cout << "Job " << R << " got " << temp.flat_x_i_.size() << " int data " << std::endl;
+        }
 
-        // push to flyweight stack
-        distributed_map_rect_flyweight local(temp);
+        distributed_data::get_mutable_instance().insert(std::make_pair(uid, temp));
+
+        //const distributed_map_rect_data& local = distributed_data::get_const_instance().find(uid)->second;
+        //std::cout << "worker " << R << " / " << W << " got shape IN " << local.N_ << ", " << local.T_ << ", " << local.X_i_ << ", " << local.X_r_ << std::endl;
 
         std::cout << "Job " << R << " done caching data for uid = " << meta[0] << "." << std::endl;
         
@@ -164,6 +153,10 @@ namespace stan {
         const std::size_t R_ = world_.rank();
         const std::size_t W_ = world_.size();
 
+        // local version of things in flattened out form
+        std::vector<double> local_theta_;
+        distributed_map_rect_data local_;
+
         // note: it would be nice to have these const, but I think C++
         // doesn't let me given how it has to be initialized
         std::size_t N_; // # of jobs for world
@@ -186,37 +179,72 @@ namespace stan {
         // # of jobs for this chunk
         std::size_t C_;
 
-        // local version of things in flattened out form
-        std::vector<double> local_theta_;
-        std::vector<double> local_x_r_;
-        std::vector<int> local_x_i_;
-
       public:
         // called on root, sents problem sizes, data and parameters
         distributed_map_rect(const std::vector<std::vector<var> >& theta,
                              const std::vector<std::vector<double> >& x_r,
                              const std::vector<std::vector<int> >& x_i)
-          : N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
+          : local_(-1), N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
           std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
             throw std::runtime_error("problem sizes can only defined on the root.");
 
+          // distribute data
+          std::size_t uid = distribute_map_rect_data(theta[0].size(), x_r, x_i);
+
+          std::cout << "root created UID = " << uid << std::endl;
+
           // make childs aware of upcoming job
           boost::shared_ptr<mpi_command> work(new run_distributed_map_rect<F>);
           boost::mpi::broadcast(world_, work, 0);
-          setup_sizes();
+
+          setup(uid);
+          
+          // sent uid
+          boost::mpi::broadcast(world_, uid, 0);
+          
           distribute_param(theta);
-          distribute_data(x_r, x_i);
+
           (*this)();
         }
-        distributed_map_rect() : N_(-1), T_(-1), X_r_(-1), X_i_(-1) {
+        // called on root, reuses registered data
+        distributed_map_rect(const std::vector<std::vector<var> >& theta,
+                             std::size_t uid)
+          : local_(-1) {
+          std::cout << "Setting up distributed_map on root, RECYCLE DATA, " << world_.rank() << " / " << W_ << std::endl;
+          if(R_ != 0)
+            throw std::runtime_error("problem sizes can only defined on the root.");
+
+          std::cout << "root RECYCLING UID = " << uid << std::endl;
+
+          // make childs aware of upcoming job
+          boost::shared_ptr<mpi_command> work(new run_distributed_map_rect<F>);
+          boost::mpi::broadcast(world_, work, 0);
+
+          setup(uid);
+          
+          // sent uid
+          boost::mpi::broadcast(world_, uid, 0);
+          
+          distribute_param(theta);
+
+          (*this)();
+        }
+        distributed_map_rect() : local_(-1) {
           std::cout << "Setting up distributed map on worker " << world_.rank() << " / " << W_ << std::endl;
           if(R_ == 0)
             throw std::runtime_error("problem sizes must be defined on the root.");
-          // called on workers, recieves problem sizes, data and parameters
-          setup_sizes();
+
+          // get uid from root
+          std::size_t uid;
+          boost::mpi::broadcast(world_, uid, 0);
+
+          std::cout << "worker " << world_.rank() << " / " << W_ << " uses UID = " << uid << std::endl;
+
+          setup(uid);
+          
           distribute_param(std::vector<std::vector<var> >());
-          distribute_data(std::vector<std::vector<double> >(), std::vector<std::vector<int> >());
+
           (*this)();
        }
 
@@ -241,8 +269,8 @@ namespace stan {
               // note: on the root node we could avoid re-creating
               // these theta var instances
               const vector<var> theta_run_v(local_theta_.begin() + i * T_, local_theta_.begin() + (i+1) * T_);
-              const vector<double> x_r_run(local_x_r_.begin() + i * X_r_, local_x_r_.begin() + (i+1) * X_r_);
-              const vector<int> x_i_run(local_x_i_.begin() + i * X_i_, local_x_i_.begin() + (i+1) * X_i_);
+              const vector<double> x_r_run(local_.flat_x_r_.begin() + i * X_r_, local_.flat_x_r_.begin() + (i+1) * X_r_);
+              const vector<int> x_i_run(local_.flat_x_i_.begin() + i * X_i_, local_.flat_x_i_.begin() + (i+1) * X_i_);
 
               const vector<var> fx_v = f(theta_run_v, x_r_run, x_i_run);
               const std::size_t F_out = fx_v.size();
@@ -360,6 +388,7 @@ namespace stan {
           return(res);
         }
 
+      private:
         // sent a new set of parameters out
         void distribute_param(const std::vector<std::vector<var> >& theta) {
           if(R_ == 0) {
@@ -386,7 +415,6 @@ namespace stan {
           std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
         }
 
-      private:
         // map N chunks to W with a chunks-size of C; used for
         // deterministic scheduling
         std::vector<int>
@@ -402,6 +430,24 @@ namespace stan {
           return(chunks);
         }
 
+        void setup(std::size_t uid) {
+           // grab data
+          local_ = distributed_data::get_mutable_instance().find(uid)->second;
+
+          // copy over sizes, etc.
+          N_ = local_.N_;
+          T_ = local_.T_;
+          X_r_ = local_.X_r_;
+          X_i_ = local_.X_i_;
+
+          chunks_ = map_chunks(1);
+          world_F_out_ = std::vector<int>(N_, 0);
+          C_ = chunks_[R_];
+
+          std::cout << "worker " << world_.rank() << " / " << W_ << " got shapes " << N_ << ", " << T_ << ", " << X_i_ << ", " << X_r_ << std::endl;
+          
+       }
+        /*
         void setup_sizes() {
           std::vector<int> sizes = { N_, T_, X_r_, X_i_ };
           boost::mpi::broadcast(world_, sizes.data(), 4, 0);
@@ -417,6 +463,7 @@ namespace stan {
 
           std::cout << "Job " << R_ << " got world problem size " << N_ << ", " << T_ << ", " << X_r_ << ", " << X_i_ << std::endl;
         }
+
 
         void distribute_data(const std::vector<std::vector<double> >& x_r,
                              const std::vector<std::vector<int> >& x_i) {
@@ -436,6 +483,7 @@ namespace stan {
             std::cout << "Job " << R_ << " got " << local_x_i_.size() << " int data " << std::endl;
           }
         }
+        */
       };
       
       
