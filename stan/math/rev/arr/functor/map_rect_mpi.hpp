@@ -14,21 +14,6 @@ namespace stan {
     
     namespace internal {
       
-      // map N chunks to W with a chunks-size of C; used for
-      // deterministic scheduling
-      std::vector<int>
-      map_chunks(std::size_t N, std::size_t W, std::size_t C = 1) {
-        std::vector<int> chunks(W, N / W);
-      
-        for(std::size_t r = 0; r != N % W; r++)
-          ++chunks[r+1];
-
-        for(std::size_t i = 0; i != W; i++)
-          chunks[i] *= C;
-
-        return(chunks);
-      }
-
       // forward declare
       std::size_t
       distribute_map_rect_data(const std::vector<std::vector<double> >& x_r,
@@ -68,7 +53,7 @@ namespace stan {
         
         if(R == 0) {
           // initiate on the root call of this function on the workers
-          mpi_worker::broadcast_command<stan::math::distributed_apply<distributed_map_rect_data> >();
+          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect_data> >();
 
           meta[0] = uid;
           meta[1] = x_r.size();
@@ -88,7 +73,7 @@ namespace stan {
 
         std::cout << "worker " << R << " / " << W << " registers shapes " << N << ", " << X_r << ", " << X_i << std::endl;
 
-        const std::vector<int> chunks = map_chunks(N, W, 1);
+        const std::vector<int> chunks = mpi_cluster::map_chunks(N, 1);
         
         data.x_r_.resize(chunks[R]);
         data.x_i_.resize(chunks[R]);
@@ -96,7 +81,7 @@ namespace stan {
            // flatten data and send out/recieve using scatterv
         if(X_r > 0) {
           const std::vector<double> world_x_r = to_array_1d(x_r);
-          const std::vector<int> chunks_x_r = map_chunks(N, W, X_r);
+          const std::vector<int> chunks_x_r = mpi_cluster::map_chunks(N, X_r);
           std::vector<double> flat_x_r_local(chunks_x_r[R]);
 
           boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, flat_x_r_local.data(), 0);
@@ -109,7 +94,7 @@ namespace stan {
         }
         if(X_i > 0) {
           const std::vector<int> world_x_i = to_array_1d(x_i);
-          const std::vector<int> chunks_x_i = map_chunks(N, W, X_i);
+          const std::vector<int> chunks_x_i = mpi_cluster::map_chunks(N, X_i);
           std::vector<int> flat_x_i_local(chunks_x_i[R]);
 
           boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, flat_x_i_local.data(), 0);
@@ -176,7 +161,7 @@ namespace stan {
           std::cout << "root created UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
-          mpi_worker::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
+          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
 
           setup(uid_);
           
@@ -199,7 +184,7 @@ namespace stan {
           std::cout << "root RECYCLING UID = " << uid << std::endl;
 
           // make childs aware of upcoming job
-          mpi_worker::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
+          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
 
           setup(uid);
           
@@ -387,25 +372,10 @@ namespace stan {
             world_theta.insert(world_theta.end(), theta_n_d.begin(), theta_n_d.end());
           }
           
-          const std::vector<int> chunks_theta = map_chunks(T_);
+          const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
           local_theta_.resize(chunks_theta[R_]);
           boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
           std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
-        }
-
-        // map N chunks to W with a chunks-size of C; used for
-        // deterministic scheduling
-        std::vector<int>
-        map_chunks(std::size_t C = 1) {
-          std::vector<int> chunks(W_, N_ / W_);
-      
-          for(std::size_t r = 0; r != N_ % W_; r++)
-            ++chunks[r+1];
-          
-          for(std::size_t i = 0; i != W_; i++)
-            chunks[i] *= C;
-
-          return(chunks);
         }
 
         void setup(std::size_t uid) {
@@ -418,7 +388,7 @@ namespace stan {
           X_r_ = local_.x_r_[0].size();
           X_i_ = local_.x_i_[0].size();
 
-          chunks_ = map_chunks(1);
+          chunks_ = mpi_cluster::map_chunks(N_, 1);
           world_F_out_ = std::vector<int>(N_, 0);
           C_ = chunks_[R_];
 

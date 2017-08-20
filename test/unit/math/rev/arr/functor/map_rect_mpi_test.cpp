@@ -1,6 +1,6 @@
 #include <stan/math.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
-#include <stan/math/prim/arr/functor/mpi_worker.hpp>
+#include <stan/math/prim/arr/functor/mpi_cluster.hpp>
 #include <stan/math/rev/arr/functor/map_rect_mpi.hpp>
 #include <boost/mpi.hpp>
 #include <boost/shared_ptr.hpp>
@@ -34,7 +34,7 @@ int main(int argc, const char* argv[]) {
   
   // on non-root processes this makes the workers listen to commands
   // send from the root
-  stan::math::mpi_worker worker;
+  stan::math::mpi_cluster cluster;
 
   std::cout << "Root process starts distributing work..." << std::endl;
 

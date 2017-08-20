@@ -37,11 +37,10 @@ namespace stan {
       }
     };
 
-    // TODO: rename to mpi_cluster
-    struct mpi_worker {
+    struct mpi_cluster {
       boost::mpi::communicator world_;
       std::size_t const R_ = world_.rank();
-      mpi_worker() {
+      mpi_cluster() {
         if(R_ != 0) {
           std::cout << "Worker " << R_ << " waiting for commands..." << std::endl;
           while(1) {
@@ -54,13 +53,11 @@ namespace stan {
         }
       }
 
-      ~mpi_worker() {
+      ~mpi_cluster() {
         // the destructor will ensure that the childs are being
         // shutdown
         if(R_ == 0) {
-          boost::shared_ptr<mpi_command> stop_command(new stop_worker());
-
-          boost::mpi::broadcast(world_, stop_command, 0);
+          broadcast_command<stop_worker>();
         }
       }
 
@@ -74,6 +71,26 @@ namespace stan {
 
           boost::mpi::broadcast(world, command, 0);
       }
+
+      // map N chunks to W with a chunks-size of C; used for
+      // deterministic scheduling
+      static
+      std::vector<int>
+      map_chunks(std::size_t N, std::size_t C = 1) {
+        boost::mpi::communicator world;
+        const std::size_t W = world.size();
+        
+        std::vector<int> chunks(W, N / W);
+      
+        for(std::size_t r = 0; r != N % W; r++)
+          ++chunks[r+1];
+
+        for(std::size_t i = 0; i != W; i++)
+          chunks[i] *= C;
+
+        return(chunks);
+      }
+
     };
 
   }
