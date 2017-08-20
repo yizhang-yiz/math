@@ -25,9 +25,22 @@ namespace stan {
       }
     };
 
+    template<typename T>
+    struct distributed_apply : public mpi_command {
+      friend class boost::serialization::access;
+      template<class Archive>
+      void serialize(Archive & ar, const unsigned int version) {
+        ar & BOOST_SERIALIZATION_BASE_OBJECT_NVP(mpi_command);
+      }
+      void run() const {
+        T::distributed_apply();
+      }
+    };
+
+    // TODO: rename to mpi_cluster
     struct mpi_worker {
       boost::mpi::communicator world_;
-      const std::size_t R_ = world_.rank();
+      std::size_t const R_ = world_.rank();
       mpi_worker() {
         if(R_ != 0) {
           std::cout << "Worker " << R_ << " waiting for commands..." << std::endl;
@@ -45,10 +58,21 @@ namespace stan {
         // the destructor will ensure that the childs are being
         // shutdown
         if(R_ == 0) {
-          boost::shared_ptr<stan::math::mpi_command> stop_command(new stop_worker());
+          boost::shared_ptr<mpi_command> stop_command(new stop_worker());
 
           boost::mpi::broadcast(world_, stop_command, 0);
         }
+      }
+
+      template<typename T>
+      static void broadcast_command() {
+        boost::mpi::communicator world;
+        if(world.rank() != 0)
+          throw std::runtime_error("only root may broadcast commands.");
+
+          boost::shared_ptr<mpi_command> command(new T);
+
+          boost::mpi::broadcast(world, command, 0);
       }
     };
 

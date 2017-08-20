@@ -15,12 +15,17 @@ struct hard_work {
     res[1] = x_r[0]*theta[1]*theta[0];
     return(res);
   }
+
+  template<typename T>
+  static
+  std::vector<T> apply(std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
+    const hard_work f;
+    return f(theta, x_r, x_i);
+  }
 };
 
-BOOST_CLASS_EXPORT(stan::math::internal::mpi_distribute_map_rect_data);
-
-BOOST_CLASS_EXPORT(stan::math::internal::run_distributed_map_rect<hard_work>);
-
+BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>);
+BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
 
 int main(int argc, const char* argv[]) {
   boost::mpi::environment env;
@@ -50,17 +55,12 @@ int main(int argc, const char* argv[]) {
 
   std::cout << "Distributing the data to the nodes..." << std::endl;
   
-  const std::size_t uid = stan::math::internal::distribute_map_rect_data(theta[0].size(), x_r, x_i);
-
-  hard_work f;
-
-  vector<stan::math::var> res = stan::math::map_rect_mpi(f, theta, x_r, x_i);
+  std::size_t uid;
+  vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(theta, x_r, x_i, uid);
   
-  std::cout << "Executing with cached data." << std::endl;
+  std::cout << "Executing with cached data for uid = " << uid << std::endl;
 
-  stan::math::internal::distributed_map_rect<hard_work> root_job_chunk_cache(theta, 1);
-  
-  vector<stan::math::var> res2 = root_job_chunk_cache.register_results();
+  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(theta, uid);
 
   std::cout << "Root process ends." << std::endl;
   
