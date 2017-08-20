@@ -25,7 +25,11 @@ struct hard_work {
 };
 
 BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>);
+BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>,track_never);
+
 BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
+BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >,track_never);
+
 
 int main(int argc, const char* argv[]) {
   boost::mpi::environment env;

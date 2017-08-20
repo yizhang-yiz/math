@@ -40,6 +40,7 @@ namespace stan {
     struct mpi_cluster {
       boost::mpi::communicator world_;
       std::size_t const R_ = world_.rank();
+      
       mpi_cluster() {
         if(R_ != 0) {
           std::cout << "Worker " << R_ << " waiting for commands..." << std::endl;
