@@ -7,6 +7,11 @@ GTEST ?= $(MATH)lib/gtest_1.7.0
 CPPLINT ?= $(MATH)lib/cpplint_4.45
 CVODES ?= $(MATH)lib/cvodes_2.9.0
 
+BOOST_LIB ?= $(BOOST)/libs
+
+## TODO: autodetect somehow?
+MPI_INCLUDE ?= /opt/local/include/openmpi-mp/
+
 ##
 # Build rules for cvodes
 ##
@@ -18,6 +23,8 @@ SUNDIALS_CVODES := $(patsubst %.c,%.o,\
 SUNDIALS_NVECSERIAL := $(patsubst %.c,%.o,\
   $(addprefix $(CVODES)/src/, nvec_ser/nvector_serial.c sundials/sundials_math.c))
 
+BOOST_SERIALIZATION := $(patsubst %.cpp,%.o,$(wildcard $(BOOST_LIB)/serialization/src/*.cpp))
+BOOST_MPI := $(patsubst %.cpp,%.o,$(wildcard $(BOOST_LIB)/mpi/src/*.cpp))
 
 $(sort $(SUNDIALS_CVODES) $(SUNDIALS_NVECSERIAL)) : %.o : %.c
 	@mkdir -p $(dir $@)
@@ -31,8 +38,28 @@ $(CVODES)/lib/libsundials_nvecserial.a: $(SUNDIALS_NVECSERIAL)
 	@mkdir -p $(dir $@)
 	$(AR) -rs $@ $^
 
+$(BOOST_SERIALIZATION) : %.o : %.cpp
+	@mkdir -p $(dir $@)
+	$(COMPILE.c) -O$(O) -isystem $(BOOST) $< -o $@
+
+$(BOOST)/lib/libboost_serialization.a: $(BOOST_SERIALIZATION)
+	@mkdir -p $(dir $@)
+	$(AR) -rs $@ $^
+
+$(BOOST_MPI) : %.o : %.cpp
+	@mkdir -p $(dir $@)
+	$(COMPILE.c) -O$(O) -isystem $(BOOST) -isystem $(MPI_INCLUDE) -DBOOST_MPI_SOURCE=1 $< -o $@
+
+$(BOOST)/lib/libboost_mpi.a: $(BOOST_MPI)
+	@mkdir -p $(dir $@)
+	$(AR) -rs $@ $^
+
+LIBMPI = $(BOOST)/lib/libboost_serialization.a $(BOOST)/lib/libboost_mpi.a
+
 LIBCVODES = $(CVODES)/lib/libsundials_nvecserial.a $(CVODES)/lib/libsundials_cvodes.a
+
+print-%  : ; @echo $* = $($*)
 
 .PHONY: clean-libraries
 clean-libraries:
-	$(RM) $(sort $(SUNDIALS_CVODES) $(SUNDIALS_NVECSERIAL) $(LIBCVODES))
+	$(RM) $(sort $(SUNDIALS_CVODES) $(SUNDIALS_NVECSERIAL) $(BOOST_SERIALIZATION) $(BOOST_MPI) $(LIBCVODES) $(LIBMPI) )
