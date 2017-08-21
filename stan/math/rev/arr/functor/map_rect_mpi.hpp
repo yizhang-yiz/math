@@ -5,114 +5,13 @@
 
 #include <stan/math/prim/mat/fun/to_array_1d.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
+#include <stan/math/prim/arr/functor/map_rect_mpi.hpp>
 
 namespace stan {
   namespace math {
 
-    // NOTE: we could use hashes to try to detect if some data has
-    // been send already
-    
     namespace internal {
-      
-      // forward declare
-      std::size_t
-      distribute_map_rect_data(const std::vector<std::vector<double> >& x_r,
-                               const std::vector<std::vector<int> >& x_i);
-
-
-      // data distribution needs to go to prim
-      struct distributed_map_rect_data {
-        distributed_map_rect_data(std::size_t uid) : uid_(uid), N_(-1) {}
-        std::size_t uid_;
-        std::size_t N_;
-        std::vector<std::vector<double> > x_r_;
-        std::vector<std::vector<int> > x_i_;
-        static void distributed_apply() {
-          // called on workers to register data
-          distribute_map_rect_data(std::vector<std::vector<double> >(), std::vector<std::vector<int> >());
-        }
-      };
-
-      typedef boost::serialization::singleton<std::map<std::size_t,const distributed_map_rect_data> > distributed_data;
-
-      std::size_t
-      distribute_map_rect_data(const std::vector<std::vector<double> >& x_r,
-                               const std::vector<std::vector<int> >& x_i) {
-        static std::size_t ref_count = 0;
-
-        const std::size_t uid = ref_count++;
-        
-        boost::mpi::communicator world;
-        
-        const std::size_t W = world.size();
-        const std::size_t R = world.rank();
-
-        std::cout << "Job " << R << " registers data..." << std::endl;
-
-        std::vector<int> meta(4, 0);
-        
-        if(R == 0) {
-          // initiate on the root call of this function on the workers
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect_data> >();
-
-          meta[0] = uid;
-          meta[1] = x_r.size();
-          meta[2] = x_r[0].size();
-          meta[3] = x_i[0].size();
-        }
-
-        boost::mpi::broadcast(world, meta.data(), 4, 0);
-
-        distributed_map_rect_data data(meta[0]);
-
-        const std::size_t N = meta[1];
-        const std::size_t X_r = meta[2];
-        const std::size_t X_i = meta[3];
-
-        data.N_ = N;
-
-        std::cout << "worker " << R << " / " << W << " registers shapes " << N << ", " << X_r << ", " << X_i << std::endl;
-
-        const std::vector<int> chunks = mpi_cluster::map_chunks(N, 1);
-        
-        data.x_r_.resize(chunks[R]);
-        data.x_i_.resize(chunks[R]);
-
-           // flatten data and send out/recieve using scatterv
-        if(X_r > 0) {
-          const std::vector<double> world_x_r = to_array_1d(x_r);
-          const std::vector<int> chunks_x_r = mpi_cluster::map_chunks(N, X_r);
-          std::vector<double> flat_x_r_local(chunks_x_r[R]);
-
-          boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, flat_x_r_local.data(), 0);
-
-          // now register data
-          for(std::size_t i = 0; i != chunks[R]; ++i)
-            data.x_r_[i] = std::vector<double>(flat_x_r_local.begin() + i * X_r, flat_x_r_local.begin() + (i+1) * X_r);
-          
-          std::cout << "Job " << R << " got " << flat_x_r_local.size() << " real data " << std::endl;
-        }
-        if(X_i > 0) {
-          const std::vector<int> world_x_i = to_array_1d(x_i);
-          const std::vector<int> chunks_x_i = mpi_cluster::map_chunks(N, X_i);
-          std::vector<int> flat_x_i_local(chunks_x_i[R]);
-
-          boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, flat_x_i_local.data(), 0);
-
-          // now register data
-          for(std::size_t i = 0; i != chunks[R]; ++i)
-            data.x_i_[i] = std::vector<int>(flat_x_i_local.begin() + i * X_i, flat_x_i_local.begin() + (i+1) * X_i);
-          
-          std::cout << "Job " << R << " got " << flat_x_i_local.size() << " int data " << std::endl;
-        }
-
-        distributed_data::get_mutable_instance().insert(std::make_pair(uid, data));
-
-        std::cout << "Job " << R << " done caching data for uid = " << meta[0] << "." << std::endl;
-        
-        return uid;
-      }
-      
+            
       template <typename F>
       class distributed_map_rect {
         boost::mpi::communicator world_;
@@ -149,16 +48,17 @@ namespace stan {
         // called on root, sents problem sizes, data and parameters
         distributed_map_rect(const std::vector<std::vector<var> >& theta,
                              const std::vector<std::vector<double> >& x_r,
-                             const std::vector<std::vector<int> >& x_i)
-          : N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
+                             const std::vector<std::vector<int> >& x_i,
+                             const std::size_t uid)
+          : uid_(uid), N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
           std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
             throw std::runtime_error("problem sizes can only defined on the root.");
 
-          // distribute data
-          uid_ = distribute_map_rect_data(x_r, x_i);
+          // checks if the data is already cached
+          distribute_map_rect_data(x_r, x_i, uid);
 
-          std::cout << "root created UID = " << uid_ << std::endl;
+          std::cout << "root uses UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
           mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
@@ -173,29 +73,7 @@ namespace stan {
 
           (*this)();
         }
-        // called on root, reuses registered data
-        distributed_map_rect(const std::vector<std::vector<var> >& theta,
-                             std::size_t uid) : uid_(uid), T_(theta[0].size())
-        {
-          std::cout << "Setting up distributed_map on root, RECYCLE DATA, " << world_.rank() << " / " << W_ << std::endl;
-          if(R_ != 0)
-            throw std::runtime_error("problem sizes can only defined on the root.");
 
-          std::cout << "root RECYCLING UID = " << uid << std::endl;
-
-          // make childs aware of upcoming job
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
-
-          setup(uid);
-          
-          // send uid & # of params
-          std::vector<int> meta = { uid_, T_ };
-          boost::mpi::broadcast(world_, meta.data(), 2, 0);
-          
-          distribute_param(theta);
-
-          (*this)();
-        }
         distributed_map_rect() {
           std::cout << "Setting up distributed map on worker " << world_.rank() << " / " << W_ << std::endl;
           if(R_ == 0)
@@ -407,27 +285,12 @@ namespace stan {
     map_rect_mpi(const std::vector<std::vector<var> >& theta,
                  const std::vector<std::vector<double> >& x_r,
                  const std::vector<std::vector<int> >& x_i,
-                 std::size_t& uid) {
+                 const std::size_t uid) {
 
-      internal::distributed_map_rect<F> root_job_chunk(theta, x_r, x_i);
-
-      uid = root_job_chunk.get_uid();
+      internal::distributed_map_rect<F> root_job_chunk(theta, x_r, x_i, uid);
 
       return(root_job_chunk.register_results());
     }
-
-    // reuse a data block with uid (must already be registered)
-    template <typename F>
-    std::vector<var>
-    map_rect_mpi(const std::vector<std::vector<var> >& theta,
-                 std::size_t uid) {
-
-      // TODO: check if data is registered
-      
-      internal::distributed_map_rect<F> root_job_chunk(theta, uid);
-
-      return(root_job_chunk.register_results());
-    }      
       
   }
 }

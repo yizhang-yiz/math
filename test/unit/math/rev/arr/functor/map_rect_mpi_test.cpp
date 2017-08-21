@@ -44,6 +44,7 @@ int main(int argc, const char* argv[]) {
 
   // create a task to be distributed
   vector<vector<stan::math::var> > theta;
+  vector<vector<double> > theta_d;
 
   const std::size_t N = 10;
 
@@ -52,6 +53,7 @@ int main(int argc, const char* argv[]) {
     theta_run[0] = n;
     theta_run[1] = n*n;
     theta.push_back(theta_run);
+    theta_d.push_back(stan::math::value_of(theta_run));
   }
 
   vector<vector<double> > x_r(N, vector<double>(1,1.0));
@@ -59,12 +61,15 @@ int main(int argc, const char* argv[]) {
 
   std::cout << "Distributing the data to the nodes..." << std::endl;
   
-  std::size_t uid;
+  const std::size_t uid = 0;
   vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(theta, x_r, x_i, uid);
   
   std::cout << "Executing with cached data for uid = " << uid << std::endl;
 
-  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(theta, uid);
+  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(theta, x_r, x_i, uid);
+
+  std::cout << "run things as double only locally..." << std::endl;
+  vector<double> res3 = stan::math::map_rect_mpi<hard_work>(theta_d, x_r, x_i, uid);
 
   std::cout << "Root process ends." << std::endl;
   
