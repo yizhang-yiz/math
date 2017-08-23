@@ -97,5 +97,6 @@ namespace stan {
   }
 }
 
-BOOST_CLASS_EXPORT(stan::math::stop_worker);
-
+BOOST_CLASS_EXPORT(stan::math::stop_worker)
+BOOST_CLASS_TRACKING(stan::math::stop_worker,track_never)
+BOOST_SERIALIZATION_FACTORY_0(stan::math::stop_worker)

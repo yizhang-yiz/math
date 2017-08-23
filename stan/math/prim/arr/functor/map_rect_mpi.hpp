@@ -44,9 +44,9 @@ namespace stan {
 
         // first check if uid is already registered
         if(distributed_data::get_const_instance().find(uid) == distributed_data::get_const_instance().cend()) {
-          std::cout << "Job " << R << " registers data..." << std::endl;
+          //std::cout << "Job " << R << " registers data..." << std::endl;
         } else {
-          std::cout << "UID = " << uid << " is ALREADY distributed." << std::endl;
+          //std::cout << "UID = " << uid << " is ALREADY distributed." << std::endl;
           return;
         }
 
@@ -72,7 +72,7 @@ namespace stan {
 
         data.N_ = N;
 
-        std::cout << "worker " << R << " / " << W << " registers shapes " << N << ", " << X_r << ", " << X_i << std::endl;
+        //std::cout << "worker " << R << " / " << W << " registers shapes " << N << ", " << X_r << ", " << X_i << std::endl;
 
         const std::vector<int> chunks = mpi_cluster::map_chunks(N, 1);
         
@@ -91,7 +91,7 @@ namespace stan {
           for(std::size_t i = 0; i != chunks[R]; ++i)
             data.x_r_[i] = std::vector<double>(flat_x_r_local.begin() + i * X_r, flat_x_r_local.begin() + (i+1) * X_r);
           
-          std::cout << "Job " << R << " got " << flat_x_r_local.size() << " real data " << std::endl;
+          //std::cout << "Job " << R << " got " << flat_x_r_local.size() << " real data " << std::endl;
         }
         if(X_i > 0) {
           const std::vector<int> world_x_i = to_array_1d(x_i);
@@ -104,12 +104,12 @@ namespace stan {
           for(std::size_t i = 0; i != chunks[R]; ++i)
             data.x_i_[i] = std::vector<int>(flat_x_i_local.begin() + i * X_i, flat_x_i_local.begin() + (i+1) * X_i);
           
-          std::cout << "Job " << R << " got " << flat_x_i_local.size() << " int data " << std::endl;
+          //std::cout << "Job " << R << " got " << flat_x_i_local.size() << " int data " << std::endl;
         }
 
         distributed_data::get_mutable_instance().insert(std::make_pair(uid, data));
 
-        std::cout << "Job " << R << " done caching data for uid = " << meta[0] << "." << std::endl;
+        //std::cout << "Job " << R << " done caching data for uid = " << meta[0] << "." << std::endl;
         
         return;
       }

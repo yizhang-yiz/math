@@ -1,0 +1,5 @@
+
+Build boost serialization and boost mpi as shared libraries
+
+./b2 --prefix=$HOME/local --with-mpi --with-serialization -j4 install
+
