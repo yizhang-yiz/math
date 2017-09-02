@@ -127,7 +127,7 @@ namespace stan {
           vector<int> local_F_out(C_, 0);
 
           try {
-            vector<double>::iterator local_theta_iter = local_theta_.begin();
+            vector<double>::const_iterator local_theta_iter = local_theta_.begin();
             vector<double> grad(E_+T_);
             const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
             for(std::size_t i = 0; i != C_; i++) {
@@ -309,7 +309,10 @@ namespace stan {
     }
 
     /* an example user functor in Stan could be */
-    // real[] map_rect(F f, real[,] theta, real[,] x_r, int[,] x_i);
+    // real[] map_rect(F f, real[] eta, real[,] theta, real[,] x_r,
+    // int[,] x_i);
+    // and the user function f has the signature
+    // real[] f(real[] eta, real[] theta, real[] x_r, int[] x_i)
 
     template <typename F>
     std::vector<var>
