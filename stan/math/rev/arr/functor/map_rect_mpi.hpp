@@ -51,22 +51,25 @@ namespace stan {
                              const std::vector<std::vector<int> >& x_i,
                              const std::size_t uid)
           : uid_(uid), N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
-          std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
+          //std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
             throw std::runtime_error("problem sizes can only defined on the root.");
 
           // checks if the data is already cached
           distribute_map_rect_data(x_r, x_i, uid);
 
-          std::cout << "root uses UID = " << uid_ << std::endl;
+          //std::cout << "root uses UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
           mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
 
-          setup(uid_);
+          //std::cout << "setting up root with uid = " << uid << std::endl;
+          setup(uid);
           
           // sent uid and # of params
-          std::vector<int> meta = { uid_, T_ };
+          std::vector<int> meta(2, 0);
+          meta[0] = uid;
+          meta[1] = T_ ;
           boost::mpi::broadcast(world_, meta.data(), 2, 0);
           
           distribute_param(theta);
@@ -75,17 +78,19 @@ namespace stan {
         }
 
         distributed_map_rect() {
-          std::cout << "Setting up distributed map on worker " << world_.rank() << " / " << W_ << std::endl;
+          //std::cout << "Setting up distributed map on worker " << world_.rank() << " / " << W_ << std::endl;
           if(R_ == 0)
             throw std::runtime_error("problem sizes must be defined on the root.");
 
+          //std::cout << "setting up child ..." << std::endl;
+          
           // get uid & # of params from root
           std::vector<int> meta(2);
           boost::mpi::broadcast(world_, meta.data(), 2, 0);
           uid_ = meta[0];
           T_ = meta[1];
 
-          std::cout << "worker " << world_.rank() << " / " << W_ << " uses UID = " << uid_ << std::endl;
+          //std::cout << "worker " << world_.rank() << " / " << W_ << " uses UID = " << uid_ << std::endl;
 
           setup(uid_);
           
@@ -152,7 +157,7 @@ namespace stan {
             local_result.resize(0);
           }
           // collect results at root
-          std::cout << "gathering output sizes..." << std::endl;
+          //std::cout << "gathering output sizes..." << std::endl;
           boost::mpi::gatherv(world_, local_F_out.data(), C_, world_F_out_.data(), chunks_, 0);
 
           // find out cumulative size of output
@@ -183,14 +188,14 @@ namespace stan {
               chunks_result[i] += world_F_out_[ij] * (T_ + 1);
 
           // collect results
-          std::cout << "gathering actual outputs..." << std::endl;
+          //std::cout << "gathering actual outputs..." << std::endl;
           boost::mpi::gatherv(world_, local_result.data(), local_result.size(), final_result_, chunks_result, 0);
 
           // now we can throw on the root if necessary as all workers have finished
           if(unlikely(R_ == 0 & !all_ok))
             throw std::runtime_error("MPI error");
 
-          std::cout << "results have been send!" << std::endl;
+          //std::cout << "results have been send!" << std::endl;
         }
 
         // called only on the root to register results in the AD stack
@@ -199,7 +204,7 @@ namespace stan {
           if(R_ != 0)
               throw std::runtime_error("results must be registered on root only.");
 
-          std::cout << "registering results" << std::endl;
+          //std::cout << "registering results" << std::endl;
           
           // insert results into the AD tree
           vari** varis
@@ -220,7 +225,7 @@ namespace stan {
             }
           }
       
-          std::cout << "results are registered" << std::endl;
+          //std::cout << "results are registered" << std::endl;
 
           return(res);
         }
@@ -253,13 +258,13 @@ namespace stan {
           const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
           local_theta_.resize(chunks_theta[R_]);
           boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
-          std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
+          //std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
         }
 
         void setup(std::size_t uid) {
            // grab data
           //local_ = distributed_data::get_mutable_instance().find(uid)->second;
-          const distributed_map_rect_data& local_ = distributed_data::get_const_instance().find(uid_)->second;
+          const distributed_map_rect_data& local_ = distributed_data::get_const_instance().find(uid)->second;
 
           // copy over sizes, etc.
           N_ = local_.N_;
@@ -270,7 +275,7 @@ namespace stan {
           world_F_out_ = std::vector<int>(N_, 0);
           C_ = chunks_[R_];
 
-          std::cout << "worker " << world_.rank() << " / " << W_ << " got shapes " << N_ << ", " << T_ << ", " << X_i_ << ", " << X_r_ << std::endl;
+          //std::cout << "worker " << world_.rank() << " / " << W_ << " got shapes " << N_ << ", " << T_ << ", " << X_i_ << ", " << X_r_ << std::endl;
           
        }
       };      

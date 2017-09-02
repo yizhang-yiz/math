@@ -24,7 +24,7 @@ namespace stan {
 }
 
 
-BOOST_SERIALIZATION_ASSUME_ABSTRACT( stan::math::mpi_command );
+BOOST_SERIALIZATION_ASSUME_ABSTRACT( stan::math::mpi_command )
 
 
 
