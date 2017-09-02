@@ -9,7 +9,7 @@
 
 struct hard_work {
   template<typename T>
-  std::vector<T> operator()(std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) const {
+  std::vector<T> operator()(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) const {
     std::vector<T> res(2);
     res[0] = theta[0]*theta[0];
     res[1] = x_r[0]*theta[1]*theta[0];
@@ -18,9 +18,9 @@ struct hard_work {
 
   template<typename T>
   static
-  std::vector<T> apply(std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
+  std::vector<T> apply(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
     const hard_work f;
-    return f(theta, x_r, x_i);
+    return f(eta, theta, x_r, x_i);
   }
 };
 
@@ -43,6 +43,8 @@ int main(int argc, const char* argv[]) {
   std::cout << "Root process starts distributing work..." << std::endl;
 
   // create a task to be distributed
+  vector<stan::math::var > eta = {2, 0};
+  vector<double> eta_d = stan::math::value_of(eta);
   vector<vector<stan::math::var> > theta;
   vector<vector<double> > theta_d;
 
@@ -62,14 +64,14 @@ int main(int argc, const char* argv[]) {
   std::cout << "Distributing the data to the nodes..." << std::endl;
   
   const std::size_t uid = 0;
-  vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(theta, x_r, x_i, uid);
+  vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
   
   std::cout << "Executing with cached data for uid = " << uid << std::endl;
 
-  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(theta, x_r, x_i, uid);
+  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
 
   std::cout << "run things as double only locally..." << std::endl;
-  vector<double> res3 = stan::math::map_rect_mpi<hard_work>(theta_d, x_r, x_i, uid);
+  vector<double> res3 = stan::math::map_rect_mpi<hard_work>(eta_d, theta_d, x_r, x_i, uid);
 
   std::cout << "Root process ends." << std::endl;
   

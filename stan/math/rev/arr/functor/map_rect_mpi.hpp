@@ -19,12 +19,14 @@ namespace stan {
         const std::size_t W_ = world_.size();
 
         // local version of things in flattened out form
+        std::vector<double> local_eta_;
         std::vector<double> local_theta_;
         std::size_t uid_;
 
         // note: it would be nice to have these const, but I think C++
         // doesn't let me given how it has to be initialized
         std::size_t N_; // # of jobs for world
+        std::size_t E_; // # of shared parameters
         std::size_t T_; // # of parameters
         std::size_t X_r_; // # of real data items per job
         std::size_t X_i_; // # of int  data items per job
@@ -36,6 +38,7 @@ namespace stan {
 
         // the parameters which can be updated; only stored at the
         // root
+        const std::vector<var>* eta_;
         typedef const std::vector<std::vector<var> > param_t;
         param_t* theta_;
 
@@ -46,11 +49,12 @@ namespace stan {
 
       public:
         // called on root, sents problem sizes, data and parameters
-        distributed_map_rect(const std::vector<std::vector<var> >& theta,
+        distributed_map_rect(const std::vector<var>& eta,
+                             const std::vector<std::vector<var> >& theta,
                              const std::vector<std::vector<double> >& x_r,
                              const std::vector<std::vector<int> >& x_i,
                              const std::size_t uid)
-          : uid_(uid), N_(theta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
+          : uid_(uid), N_(theta.size()), E_(eta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
           //std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
             throw std::runtime_error("problem sizes can only defined on the root.");
@@ -67,12 +71,13 @@ namespace stan {
           setup(uid);
           
           // sent uid and # of params
-          std::vector<int> meta(2, 0);
+          std::vector<int> meta(3, 0);
           meta[0] = uid;
-          meta[1] = T_ ;
-          boost::mpi::broadcast(world_, meta.data(), 2, 0);
+          meta[1] = E_ ;
+          meta[2] = T_ ;
+          boost::mpi::broadcast(world_, meta.data(), 3, 0);
           
-          distribute_param(theta);
+          distribute_param(eta, theta);
 
           (*this)();
         }
@@ -85,16 +90,17 @@ namespace stan {
           //std::cout << "setting up child ..." << std::endl;
           
           // get uid & # of params from root
-          std::vector<int> meta(2);
-          boost::mpi::broadcast(world_, meta.data(), 2, 0);
+          std::vector<int> meta(3);
+          boost::mpi::broadcast(world_, meta.data(), 3, 0);
           uid_ = meta[0];
-          T_ = meta[1];
+          E_ = meta[1];
+          T_ = meta[2];
 
           //std::cout << "worker " << world_.rank() << " / " << W_ << " uses UID = " << uid_ << std::endl;
 
           setup(uid_);
           
-          distribute_param(std::vector<std::vector<var> >());
+          distribute_param(std::vector<var>(), std::vector<std::vector<var> >());
 
           (*this)();
         }
@@ -121,30 +127,38 @@ namespace stan {
           vector<int> local_F_out(C_, 0);
 
           try {
+            vector<double>::iterator local_theta_iter = local_theta_.begin();
+            vector<double> grad(E_+T_);
+            const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
             for(std::size_t i = 0; i != C_; i++) {
               start_nested();
 
               // note: on the root node we could avoid re-creating
               // these theta var instances
-              const vector<var> theta_run_v(local_theta_.begin() + i * T_, local_theta_.begin() + (i+1) * T_);
+              const vector<var> theta_run_v(local_theta_iter, local_theta_iter + T_);
 
-              const vector<var> fx_v = F::apply(theta_run_v, local_.x_r_[i], local_.x_i_[i]);
+              vector<var> z_vars;
+              z_vars.reserve(E_+T_);
+              z_vars.insert(z_vars.end(),   eta_run_v.begin(),   eta_run_v.end());
+              z_vars.insert(z_vars.end(), theta_run_v.begin(), theta_run_v.end());
+
+              vector<var> fx_v = F::apply(eta_run_v, theta_run_v, local_.x_r_[i], local_.x_i_[i]);
               const std::size_t F_out = fx_v.size();
               
               local_F_out[i] = F_out;
 
               vector<double> FJx;
-              FJx.reserve(F_out * (T_+1));
+              FJx.reserve(F_out * (E_+T_+1));
               
               for (std::size_t i = 0; i != F_out; ++i) {
                 FJx.push_back(fx_v[i].val());
                 set_zero_all_adjoints_nested();
-                grad(fx_v[i].vi_);
-                for (std::size_t k = 0; k != T_; ++k)
-                  FJx.push_back(theta_run_v[k].adj());
+                fx_v[i].grad(z_vars, grad);
+                FJx.insert(FJx.end(), grad.begin(), grad.end());
               }
               local_result.insert(local_result.end(), FJx.begin(), FJx.end());
-              
+
+              local_theta_iter += T_;
               recover_memory_nested();
             }
           } catch(const std::exception& e) {
@@ -160,7 +174,7 @@ namespace stan {
           //std::cout << "gathering output sizes..." << std::endl;
           boost::mpi::gatherv(world_, local_F_out.data(), C_, world_F_out_.data(), chunks_, 0);
 
-          // find out cumulative size of output
+          // find out cumulative size of output on root
           bool all_ok = true;
           F_out_sum_ = 0;
 
@@ -178,14 +192,13 @@ namespace stan {
             // allocate memory on AD stack for final result. Note that the
             // gradients and the function results will land there
             final_result_
-              = ChainableStack::memalloc_.alloc_array<double>( (T_ + 1) * F_out_sum_ );
-
+              = ChainableStack::memalloc_.alloc_array<double>( (E_ + T_ + 1) * F_out_sum_ );
           }
 
           vector<int> chunks_result(W_,0);
           for(std::size_t i=0, ij=0; i != W_; ++i)
             for(std::size_t j=0; j != chunks_[i]; ++j, ++ij)
-              chunks_result[i] += world_F_out_[ij] * (T_ + 1);
+              chunks_result[i] += world_F_out_[ij] * (E_ + T_ + 1);
 
           // collect results
           //std::cout << "gathering actual outputs..." << std::endl;
@@ -208,20 +221,22 @@ namespace stan {
           
           // insert results into the AD tree
           vari** varis
-            = ChainableStack::memalloc_.alloc_array<vari*>(N_*T_);
+            = ChainableStack::memalloc_.alloc_array<vari*>(N_*(E_+T_));
 
           std::vector<var> res;
           res.reserve(F_out_sum_);
-    
+
           for(std::size_t i=0, ik=0; i != N_; i++) {
             // link the operands...
+            for(std::size_t j=0; j != E_; j++)
+              varis[i * (E_+T_) + j] = (*eta_)[j].vi_;
             for(std::size_t j=0; j != T_; j++)
-              varis[i * T_ + j] = (*theta_)[i][j].vi_;
+              varis[i * (E_+T_) + E_ + j] = (*theta_)[i][j].vi_;
 
             // ...with partials of outputs
             for(std::size_t k=0; k != world_F_out_[i]; k++, ik++) {
-              const double val = *(final_result_ + (T_+1) * ik);
-              res.push_back(var(new precomputed_gradients_vari(val, T_, varis + i * T_, final_result_ + (T_+1) * ik + 1)));
+              const double val = *(final_result_ + (E_+T_+1) * ik);
+              res.push_back(var(new precomputed_gradients_vari(val, E_+T_, varis + i * (E_+T_), final_result_ + (E_+T_+1) * ik + 1)));
             }
           }
       
@@ -236,29 +251,40 @@ namespace stan {
 
       private:
         // sent a new set of parameters out
-        void distribute_param(const std::vector<std::vector<var> >& theta) {
+        void distribute_param(const std::vector<var>& eta, const std::vector<std::vector<var> >& theta) {
           if(R_ == 0) {
             if(theta.size() != N_)
               throw std::runtime_error("problem size mismatch.");
             if(theta[0].size() != T_)
               throw std::runtime_error("parameter size mismatch.");
 
+            eta_ = &eta;
             theta_ = &theta;
           }
 
-          // flatten and send out/recieve using scatterv
-          std::vector<double> world_theta;
-          world_theta.reserve(theta.size()*T_);
-          
-          for(std::size_t n = 0; n != theta.size(); ++n) {
-            const std::vector<double> theta_n_d = stan::math::value_of(theta[n]);
-            world_theta.insert(world_theta.end(), theta_n_d.begin(), theta_n_d.end());
+          // sent shared parameters to all workers
+          if(E_ > 0) {
+            local_eta_.resize(E_);
+            boost::mpi::broadcast(world_, local_eta_.data(), E_, 0);
           }
           
-          const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
-          local_theta_.resize(chunks_theta[R_]);
-          boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
-          //std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
+          if(T_ > 0) {
+            // flatten and send out/recieve using scatterv
+            std::vector<double> world_theta;
+            world_theta.reserve(theta.size()*T_);
+          
+            for(std::size_t n = 0; n != theta.size(); ++n) {
+              const std::vector<double> theta_n_d = stan::math::value_of(theta[n]);
+              world_theta.insert(world_theta.end(), theta_n_d.begin(), theta_n_d.end());
+            }
+          
+            const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
+            local_theta_.resize(chunks_theta[R_]);
+            boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
+            //std::cout << "Job " << R_ << " got " <<
+            //local_theta_.size() << " parameters " << std::endl;
+          }
+
         }
 
         void setup(std::size_t uid) {
@@ -287,12 +313,13 @@ namespace stan {
 
     template <typename F>
     std::vector<var>
-    map_rect_mpi(const std::vector<std::vector<var> >& theta,
+    map_rect_mpi(const std::vector<var>& eta,
+                 const std::vector<std::vector<var> >& theta,
                  const std::vector<std::vector<double> >& x_r,
                  const std::vector<std::vector<int> >& x_i,
                  const std::size_t uid) {
 
-      internal::distributed_map_rect<F> root_job_chunk(theta, x_r, x_i, uid);
+      internal::distributed_map_rect<F> root_job_chunk(eta, theta, x_r, x_i, uid);
 
       return(root_job_chunk.register_results());
     }
