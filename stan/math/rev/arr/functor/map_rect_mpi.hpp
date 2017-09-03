@@ -28,8 +28,6 @@ namespace stan {
         std::size_t N_; // # of jobs for world
         std::size_t E_; // # of shared parameters
         std::size_t T_; // # of parameters
-        std::size_t X_r_; // # of real data items per job
-        std::size_t X_i_; // # of int  data items per job
         
         // # of outputs per job
         std::size_t F_out_sum_ = 0;
@@ -54,7 +52,7 @@ namespace stan {
                              const std::vector<std::vector<double> >& x_r,
                              const std::vector<std::vector<int> >& x_i,
                              const std::size_t uid)
-          : uid_(uid), N_(theta.size()), E_(eta.size()), T_(theta[0].size()), X_r_(x_r[0].size()), X_i_(x_i[0].size()) {
+          : uid_(uid), N_(theta.size()), E_(eta.size()), T_(theta[0].size()) {
           //std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
             throw std::runtime_error("problem sizes can only defined on the root.");
@@ -121,7 +119,7 @@ namespace stan {
           vector<double> local_result;
           // reserve output size for 5 function outputs per job... we
           // will find out during evaluation
-          local_result.reserve(C_*5*(1+T_));
+          local_result.reserve(C_*5*(1+E_+T_));
 
           // number of outputs per job
           vector<int> local_F_out(C_, 0);
@@ -294,9 +292,7 @@ namespace stan {
 
           // copy over sizes, etc.
           N_ = local_.N_;
-          X_r_ = local_.x_r_[0].size();
-          X_i_ = local_.x_i_[0].size();
-
+          
           chunks_ = mpi_cluster::map_chunks(N_, 1);
           world_F_out_ = std::vector<int>(N_, 0);
           C_ = chunks_[R_];
