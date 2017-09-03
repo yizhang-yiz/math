@@ -148,10 +148,10 @@ namespace stan {
               vector<double> FJx;
               FJx.reserve(F_out * (E_+T_+1));
               
-              for (std::size_t i = 0; i != F_out; ++i) {
-                FJx.push_back(fx_v[i].val());
+              for (std::size_t j = 0; j != F_out; ++j) {
+                FJx.push_back(fx_v[j].val());
                 set_zero_all_adjoints_nested();
-                fx_v[i].grad(z_vars, grad);
+                fx_v[j].grad(z_vars, grad);
                 FJx.insert(FJx.end(), grad.begin(), grad.end());
               }
               local_result.insert(local_result.end(), FJx.begin(), FJx.end());
