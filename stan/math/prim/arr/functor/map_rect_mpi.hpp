@@ -129,6 +129,9 @@ namespace stan {
       for(std::size_t i = 0; i != N; ++i) {
         const std::vector<double> f = F::apply(eta, theta[i], x_r[i], x_i[i]);
         res.insert(res.end(), f.begin(), f.end());
+
+        //for(std::size_t j = 0; j != f.size(); j++)
+        //  std::cout << "res[" << i << ", " << j << "] = " << f[j] << std::endl;
       }
 
       return(res);

@@ -132,10 +132,10 @@ namespace stan {
           try {
             vector<double>::const_iterator local_theta_iter = local_theta_.begin();
             vector<double> grad(E_+T_);
-            const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
             for(std::size_t i = 0; i != C_; i++) {
               start_nested();
 
+              const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
               // note: on the root node we could avoid re-creating
               // these theta var instances
               const vector<var> theta_run_v(local_theta_iter, local_theta_iter + T_);
@@ -241,6 +241,8 @@ namespace stan {
           // sent shared parameters to all workers
           if(E_ > 0) {
             local_eta_.resize(E_);
+            if(R_ == 0)
+              local_eta_ = value_of(eta);
             boost::mpi::broadcast(world_, local_eta_.data(), E_, 0);
           }
           
