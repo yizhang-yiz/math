@@ -1,25 +1,27 @@
 #include <stan/math.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
 #include <stan/math/prim/arr/functor/mpi_cluster.hpp>
-#include <stan/math/rev/arr/functor/map_rect_mpi.hpp>
+#include <stan/math/prim/arr/functor/map_rect_lpdf_mpi.hpp>
+#include <stan/math/rev/arr/functor/map_rect_lpdf_mpi.hpp>
 #include <boost/mpi.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include <iostream>
 
-struct hard_work {
+struct hard_work_lpdf {
   template<typename T>
-  std::vector<T> operator()(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) const {
+  T operator()(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) const {
     std::vector<T> res(2);
     res[0] = theta[0]*theta[0];
     res[1] = x_r[0]*theta[1]*theta[0];
-    return(res);
+    T summed = log(res[0]*res[0] + res[1]*res[1]);
+    return(summed);
   }
 
   template<typename T>
   static
-  std::vector<T> apply(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
-    const hard_work f;
+  T apply(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
+    const hard_work_lpdf f;
     return f(eta, theta, x_r, x_i);
   }
 };
@@ -27,8 +29,8 @@ struct hard_work {
 BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>);
 BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>,track_never);
 
-BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
-BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >,track_never);
+BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_lpdf<hard_work_lpdf> >);
+BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_lpdf<hard_work_lpdf> >,track_never);
 
 
 int main(int argc, const char* argv[]) {
@@ -64,14 +66,14 @@ int main(int argc, const char* argv[]) {
   std::cout << "Distributing the data to the nodes..." << std::endl;
   
   const std::size_t uid = 0;
-  vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
+  stan::math::var res = stan::math::map_rect_lpdf_mpi<hard_work_lpdf>(eta, theta, x_r, x_i, uid);
   
   std::cout << "Executing with cached data for uid = " << uid << std::endl;
 
-  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
+  stan::math::var res2 = stan::math::map_rect_lpdf_mpi<hard_work_lpdf>(eta, theta, x_r, x_i, uid);
 
   std::cout << "run things as double only locally..." << std::endl;
-  vector<double> res3 = stan::math::map_rect_mpi<hard_work>(eta_d, theta_d, x_r, x_i, uid);
+  double res3 = stan::math::map_rect_lpdf_mpi<hard_work_lpdf>(eta_d, theta_d, x_r, x_i, uid);
 
   std::cout << "Root process ends." << std::endl;
   

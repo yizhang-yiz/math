@@ -3,9 +3,12 @@
 #include <vector>
 #include <set>
 
+#include <boost/mpi/operations.hpp>
+
 #include <stan/math/prim/mat/fun/to_array_1d.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
 #include <stan/math/prim/arr/functor/map_rect_mpi.hpp>
+//#include <stan/math/rev/arr/functor/map_rect_mpi.hpp>
 
 namespace stan {
   namespace math {
@@ -13,7 +16,7 @@ namespace stan {
     namespace internal {
             
       template <typename F>
-      class distributed_map_rect {
+      class distributed_map_rect_lpdf {
         boost::mpi::communicator world_;
         const std::size_t R_ = world_.rank();
         const std::size_t W_ = world_.size();
@@ -30,9 +33,7 @@ namespace stan {
         std::size_t T_; // # of parameters
         
         // # of outputs per job
-        std::size_t F_out_sum_ = 0;
         double *final_result_ = 0;
-        std::vector<int> world_F_out_;
 
         // the parameters which can be updated; only stored at the
         // root
@@ -47,11 +48,11 @@ namespace stan {
 
       public:
         // called on root, sents problem sizes, data and parameters
-        distributed_map_rect(const std::vector<var>& eta,
-                             const std::vector<std::vector<var> >& theta,
-                             const std::vector<std::vector<double> >& x_r,
-                             const std::vector<std::vector<int> >& x_i,
-                             const std::size_t uid)
+        distributed_map_rect_lpdf(const std::vector<var>& eta,
+                                  const std::vector<std::vector<var> >& theta,
+                                  const std::vector<std::vector<double> >& x_r,
+                                  const std::vector<std::vector<int> >& x_i,
+                                  const std::size_t uid)
           : uid_(uid), N_(theta.size()), E_(eta.size()), T_(theta[0].size()) {
           //std::cout << "Setting up distributed_map on root " << world_.rank() << " / " << W_ << std::endl;
           if(R_ != 0)
@@ -63,7 +64,7 @@ namespace stan {
           //std::cout << "root uses UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
+          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect_lpdf<F> > >();
 
           //std::cout << "setting up root with uid = " << uid << std::endl;
           setup(uid);
@@ -80,7 +81,7 @@ namespace stan {
           (*this)();
         }
 
-        distributed_map_rect() {
+        distributed_map_rect_lpdf() {
           //std::cout << "Setting up distributed map on worker " << world_.rank() << " / " << W_ << std::endl;
           if(R_ == 0)
             throw std::runtime_error("problem sizes must be defined on the root.");
@@ -107,7 +108,7 @@ namespace stan {
           // entry point when called on remote
 
           // call default constructor
-          distributed_map_rect<F> job_chunk;
+          distributed_map_rect_lpdf<F> job_chunk;
         }
 
         // process work chunks; collect results at root
@@ -115,14 +116,18 @@ namespace stan {
           using std::vector;
 
           const distributed_map_rect_data& local_ = distributed_data::get_const_instance().find(uid_)->second;
-          
-          vector<double> local_result;
-          // reserve output size for 5 function outputs per job... we
-          // will find out during evaluation
-          local_result.reserve(C_*5*(1+E_+T_));
 
-          // number of outputs per job
-          vector<int> local_F_out(C_, 0);
+          // holds accumulated terms: function output and summed
+          // partials of shared parameters
+          vector<double> local_result_sum(1+E_,0);
+          
+          // holds partials of per job parameters
+          vector<double> local_result; 
+          
+          // reserve output size
+          local_result.reserve(C_*T_);
+
+          bool all_ok = true;
 
           try {
             vector<double>::const_iterator local_theta_iter = local_theta_.begin();
@@ -140,21 +145,16 @@ namespace stan {
               z_vars.insert(z_vars.end(),   eta_run_v.begin(),   eta_run_v.end());
               z_vars.insert(z_vars.end(), theta_run_v.begin(), theta_run_v.end());
 
-              vector<var> fx_v = F::apply(eta_run_v, theta_run_v, local_.x_r_[i], local_.x_i_[i]);
-              const std::size_t F_out = fx_v.size();
+              var fx_v = F::apply(eta_run_v, theta_run_v, local_.x_r_[i], local_.x_i_[i]);
               
-              local_F_out[i] = F_out;
+              fx_v.grad(z_vars, grad);
 
-              vector<double> FJx;
-              FJx.reserve(F_out * (E_+T_+1));
-              
-              for (std::size_t j = 0; j != F_out; ++j) {
-                FJx.push_back(fx_v[j].val());
-                set_zero_all_adjoints_nested();
-                fx_v[j].grad(z_vars, grad);
-                FJx.insert(FJx.end(), grad.begin(), grad.end());
+              local_result_sum[0] += fx_v.val();
+              for (std::size_t j = 0; j != E_; ++j) {
+                local_result_sum[1+j] += grad[j];
               }
-              local_result.insert(local_result.end(), FJx.begin(), FJx.end());
+
+              local_result.insert(local_result.end(), grad.begin() + E_, grad.end());
 
               local_theta_iter += T_;
               recover_memory_nested();
@@ -163,44 +163,27 @@ namespace stan {
             recover_memory_nested();
             // we only abort further processing. The root node will
             // detect unfinished runs and throw. Flag failure.
-            local_F_out = vector<int>(C_, 0);
-            local_F_out[0] = -1;
-            // we can discard all data
-            local_result.resize(0);
+            all_ok = false;
           }
           // collect results at root
-          //std::cout << "gathering output sizes..." << std::endl;
-          boost::mpi::gatherv(world_, local_F_out.data(), C_, world_F_out_.data(), chunks_, 0);
-
-          // find out cumulative size of output on root
-          bool all_ok = true;
-          F_out_sum_ = 0;
 
           // we only allocate any memory on the root
           if(R_ == 0) {
-            for(std::size_t i=0; i != N_; ++i) {
-              if(world_F_out_[i] == -1) {
-                all_ok = false;
-                world_F_out_[i] = 0; // set to 0 to get a correct sum below
-              } else {
-                F_out_sum_ += world_F_out_[i];
-              }
-            }
-      
             // allocate memory on AD stack for final result. Note that the
             // gradients and the function results will land there
             final_result_
-              = ChainableStack::memalloc_.alloc_array<double>( (E_ + T_ + 1) * F_out_sum_ );
+              = ChainableStack::memalloc_.alloc_array<double>( 1 + E_ + N_ * T_ );
           }
 
-          vector<int> chunks_result(W_,0);
-          for(std::size_t i=0, ij=0; i != W_; ++i)
-            for(std::size_t j=0; j != chunks_[i]; ++j, ++ij)
-              chunks_result[i] += world_F_out_[ij] * (E_ + T_ + 1);
 
-          // collect results
+          // collect results, first call a MPI reduce on the results
+          // which are directly accumulated
           //std::cout << "gathering actual outputs..." << std::endl;
-          boost::mpi::gatherv(world_, local_result.data(), local_result.size(), final_result_, chunks_result, 0);
+          boost::mpi::reduce(world_, local_result_sum.data(), local_result_sum.size(), final_result_, std::plus<double>(), 0);
+
+          // next we collect the remaining individual partials
+          vector<int> chunks_result = mpi_cluster::map_chunks(N_, T_);
+          boost::mpi::gatherv(world_, local_result.data(), local_result.size(), final_result_ + 1 + E_, chunks_result, 0);
 
           // now we can throw on the root if necessary as all workers have finished
           if(unlikely(R_ == 0 & !all_ok))
@@ -211,7 +194,7 @@ namespace stan {
 
         // called only on the root to register results in the AD stack
         // and setup a the results var vector
-        std::vector<var> register_results() {
+        var register_results() {
           if(R_ != 0)
               throw std::runtime_error("results must be registered on root only.");
 
@@ -219,27 +202,22 @@ namespace stan {
           
           // insert results into the AD tree
           vari** varis
-            = ChainableStack::memalloc_.alloc_array<vari*>(N_*(E_+T_));
+            = ChainableStack::memalloc_.alloc_array<vari*>(E_+N_*T_);
 
-          std::vector<var> res;
-          res.reserve(F_out_sum_);
-
-          for(std::size_t i=0, ik=0; i != N_; i++) {
-            // link the operands...
-            for(std::size_t j=0; j != E_; j++)
-              varis[i * (E_+T_) + j] = (*eta_)[j].vi_;
+          // link the operands...
+          for(std::size_t i=0; i != E_; i++)
+            varis[i] = (*eta_)[i].vi_;
+          
+          for(std::size_t i=0; i != N_; i++) {
             for(std::size_t j=0; j != T_; j++)
-              varis[i * (E_+T_) + E_ + j] = (*theta_)[i][j].vi_;
-
-            // ...with partials of outputs
-            for(std::size_t k=0; k != world_F_out_[i]; k++, ik++) {
-              const double val = *(final_result_ + (E_+T_+1) * ik);
-              res.push_back(var(new precomputed_gradients_vari(val, E_+T_, varis + i * (E_+T_), final_result_ + (E_+T_+1) * ik + 1)));
-            }
+              varis[E_ + i * T_ + j] = (*theta_)[i][j].vi_;
           }
       
           //std::cout << "results are registered" << std::endl;
-
+          //... to the partials
+          const double val = *(final_result_);
+          var res(new precomputed_gradients_vari(val, E_+N_*T_, varis, final_result_ + 1));
+          
           return(res);
         }
 
@@ -292,33 +270,36 @@ namespace stan {
 
           // copy over sizes, etc.
           N_ = local_.N_;
-          
+
           chunks_ = mpi_cluster::map_chunks(N_, 1);
-          world_F_out_ = std::vector<int>(N_, 0);
           C_ = chunks_[R_];
 
           //std::cout << "worker " << world_.rank() << " / " << W_ << " got shapes " << N_ << ", " << T_ << ", " << X_i_ << ", " << X_r_ << std::endl;
           
-       }
-      };      
+        }
+      };     
       
-    }
+      }
 
     /* an example user functor in Stan could be */
-    // real[] map_rect(F f, real[] eta, real[,] theta, real[,] x_r,
+    // real map_rect(F f, real[] eta, real[,] theta, real[,] x_r,
     // int[,] x_i);
     // and the user function f has the signature
-    // real[] f(real[] eta, real[] theta, real[] x_r, int[] x_i)
+    // real f(real[] eta, real[] theta, real[] x_r, int[] x_i)
+
+    // this version accumulates all output values which allows to
+    // accumulate the partials of the shared parameters as well
+    // locally on each worker.
 
     template <typename F>
-    std::vector<var>
-    map_rect_mpi(const std::vector<var>& eta,
-                 const std::vector<std::vector<var> >& theta,
-                 const std::vector<std::vector<double> >& x_r,
-                 const std::vector<std::vector<int> >& x_i,
-                 const std::size_t uid) {
+    var
+    map_rect_lpdf_mpi(const std::vector<var>& eta,
+                      const std::vector<std::vector<var> >& theta,
+                      const std::vector<std::vector<double> >& x_r,
+                      const std::vector<std::vector<int> >& x_i,
+                      const std::size_t uid) {
 
-      internal::distributed_map_rect<F> root_job_chunk(eta, theta, x_r, x_i, uid);
+      internal::distributed_map_rect_lpdf<F> root_job_chunk(eta, theta, x_r, x_i, uid);
 
       return(root_job_chunk.register_results());
     }
