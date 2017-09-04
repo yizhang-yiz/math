@@ -65,6 +65,9 @@ int main(int argc, const char* argv[]) {
   
   const std::size_t uid = 0;
   vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
+
+  for(std::size_t i = 0; i != N; i++)
+    std::cout << "res[" << i << "] = " << res[i] << std::endl;
   
   std::cout << "Executing with cached data for uid = " << uid << std::endl;
 

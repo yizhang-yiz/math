@@ -127,10 +127,17 @@ namespace stan {
           try {
             vector<double>::const_iterator local_theta_iter = local_theta_.begin();
             vector<double> grad(E_+T_);
-            const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
+            //for(std::size_t m=0; m != eta_run_v.size(); m++)
+            //  std::cout << "eta_run_v = " << value_of(eta_run_v[m]) << std::endl;
             for(std::size_t i = 0; i != C_; i++) {
               start_nested();
-
+              //std::cout << "job i = " << i << std::endl;
+              
+              // I am not sure why the eta_v must be declared inside
+              // the nested block? I think it should be possible to
+              // have this outside of the for loop, but this gives
+              // wrong results
+              const vector<var> eta_run_v(local_eta_.begin(), local_eta_.end());
               // note: on the root node we could avoid re-creating
               // these theta var instances
               const vector<var> theta_run_v(local_theta_iter, local_theta_iter + T_);
@@ -142,6 +149,11 @@ namespace stan {
 
               vector<var> fx_v = F::apply(eta_run_v, theta_run_v, local_.x_r_[i], local_.x_i_[i]);
               const std::size_t F_out = fx_v.size();
+
+              //for(std::size_t m=0; m != theta_run_v.size(); m++)
+              //  std::cout << "theta_run_v = " << theta_run_v[m] << std::endl;
+              //for(std::size_t m=0; m != z_vars.size(); m++)
+              //  std::cout << "z_vars = " << z_vars[m] << std::endl;
               
               local_F_out[i] = F_out;
 
@@ -168,6 +180,10 @@ namespace stan {
             // we can discard all data
             local_result.resize(0);
           }
+
+          //for(std::size_t m=0; m != local_result.size(); m++)
+          //  std::cout << "local_result = " << local_result[m] << std::endl;
+
           // collect results at root
           //std::cout << "gathering output sizes..." << std::endl;
           boost::mpi::gatherv(world_, local_F_out.data(), C_, world_F_out_.data(), chunks_, 0);
@@ -263,7 +279,10 @@ namespace stan {
           // sent shared parameters to all workers
           if(E_ > 0) {
             local_eta_.resize(E_);
+            if(R_ == 0)
+              local_eta_ = value_of(eta);
             boost::mpi::broadcast(world_, local_eta_.data(), E_, 0);
+            //std::cout << "Job " << R_ << " got " << local_eta_.size() << " shared parameters " << std::endl;
           }
           
           if(T_ > 0) {
@@ -279,8 +298,7 @@ namespace stan {
             const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
             local_theta_.resize(chunks_theta[R_]);
             boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
-            //std::cout << "Job " << R_ << " got " <<
-            //local_theta_.size() << " parameters " << std::endl;
+            //std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
           }
 
         }
@@ -319,6 +337,11 @@ namespace stan {
                  const std::size_t uid) {
 
       internal::distributed_map_rect<F> root_job_chunk(eta, theta, x_r, x_i, uid);
+
+      //std::vector<var> res = root_job_chunk.register_results();
+
+      //for(std::size_t i = 0; i != res.size(); i++)
+      //  std::cout << "res2[" << i << "] = " << value_of(res[i]) << std::endl;
 
       return(root_job_chunk.register_results());
     }
