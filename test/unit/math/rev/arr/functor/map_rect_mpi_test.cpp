@@ -9,7 +9,7 @@
 
 struct hard_work {
   template<typename T>
-  std::vector<T> operator()(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) const {
+  std::vector<T> operator()(const std::vector<T>& eta, const std::vector<T>& theta, const std::vector<double>& x_r, const std::vector<int>& x_i) const {
     std::vector<T> res(2);
     res[0] = theta[0]*theta[0];
     res[1] = x_r[0]*theta[1]*theta[0];
@@ -18,17 +18,15 @@ struct hard_work {
 
   template<typename T>
   static
-  std::vector<T> apply(std::vector<T> eta, std::vector<T> theta, std::vector<double> x_r, std::vector<int> x_i) {
+  std::vector<T> apply(const std::vector<T>& eta, const std::vector<T>& theta, const std::vector<double>& x_r, const std::vector<int>& x_i) {
     const hard_work f;
     return f(eta, theta, x_r, x_i);
   }
 };
 
-BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>);
-BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect_data>,track_never);
 
-BOOST_CLASS_EXPORT(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
-BOOST_CLASS_TRACKING(stan::math::distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >,track_never);
+BOOST_CLASS_EXPORT(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
+BOOST_CLASS_TRACKING(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >,track_never);
 
 
 int main(int argc, const char* argv[]) {

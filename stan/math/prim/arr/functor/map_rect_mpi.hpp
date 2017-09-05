@@ -54,7 +54,7 @@ namespace stan {
         
         if(R == 0) {
           // initiate on the root call of this function on the workers
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect_data> >();
+          mpi_broadcast_command<stan::math::mpi_distributed_apply<distributed_map_rect_data> >();
 
           meta[0] = uid;
           meta[1] = x_r.size();
@@ -74,7 +74,7 @@ namespace stan {
 
         //std::cout << "worker " << R << " / " << W << " registers shapes " << N << ", " << X_r << ", " << X_i << std::endl;
 
-        const std::vector<int> chunks = mpi_cluster::map_chunks(N, 1);
+        const std::vector<int> chunks = mpi_map_chunks(N, 1);
         
         data.x_r_.resize(chunks[R]);
         data.x_i_.resize(chunks[R]);
@@ -82,7 +82,7 @@ namespace stan {
            // flatten data and send out/recieve using scatterv
         if(X_r > 0) {
           const std::vector<double> world_x_r = to_array_1d(x_r);
-          const std::vector<int> chunks_x_r = mpi_cluster::map_chunks(N, X_r);
+          const std::vector<int> chunks_x_r = mpi_map_chunks(N, X_r);
           std::vector<double> flat_x_r_local(chunks_x_r[R]);
 
           boost::mpi::scatterv(world, world_x_r.data(), chunks_x_r, flat_x_r_local.data(), 0);
@@ -95,7 +95,7 @@ namespace stan {
         }
         if(X_i > 0) {
           const std::vector<int> world_x_i = to_array_1d(x_i);
-          const std::vector<int> chunks_x_i = mpi_cluster::map_chunks(N, X_i);
+          const std::vector<int> chunks_x_i = mpi_map_chunks(N, X_i);
           std::vector<int> flat_x_i_local(chunks_x_i[R]);
 
           boost::mpi::scatterv(world, world_x_i.data(), chunks_x_i, flat_x_i_local.data(), 0);
@@ -139,3 +139,8 @@ namespace stan {
 
   }
 }
+
+
+BOOST_CLASS_EXPORT(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect_data>);
+BOOST_CLASS_TRACKING(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect_data>,track_never);
+BOOST_SERIALIZATION_FACTORY_0(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect_data>)

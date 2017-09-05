@@ -63,7 +63,7 @@ namespace stan {
           //std::cout << "root uses UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect<F> > >();
+          mpi_broadcast_command<stan::math::mpi_distributed_apply<distributed_map_rect<F> > >();
 
           //std::cout << "setting up root with uid = " << uid << std::endl;
           setup(uid);
@@ -295,7 +295,7 @@ namespace stan {
               world_theta.insert(world_theta.end(), theta_n_d.begin(), theta_n_d.end());
             }
           
-            const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
+            const std::vector<int> chunks_theta = mpi_map_chunks(N_, T_);
             local_theta_.resize(chunks_theta[R_]);
             boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
             //std::cout << "Job " << R_ << " got " << local_theta_.size() << " parameters " << std::endl;
@@ -311,7 +311,7 @@ namespace stan {
           // copy over sizes, etc.
           N_ = local_.N_;
           
-          chunks_ = mpi_cluster::map_chunks(N_, 1);
+          chunks_ = mpi_map_chunks(N_, 1);
           world_F_out_ = std::vector<int>(N_, 0);
           C_ = chunks_[R_];
 

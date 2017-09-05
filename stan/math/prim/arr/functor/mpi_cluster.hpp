@@ -1,17 +1,20 @@
 #pragma once
 
+#include <mutex>
+
 #include <boost/mpi.hpp>
-#include <stan/math/prim/arr/functor/mpi_command.hpp>
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 
+#include <stan/math/prim/arr/functor/mpi_command.hpp>
+
 namespace stan {
   namespace math {
 
     // MPI command which will shut down a child gracefully
-    struct stop_worker : public mpi_command {
+    struct mpi_stop_worker : public mpi_command {
       friend class boost::serialization::access;
       template<class Archive>
       void serialize(Archive & ar, const unsigned int version) {
@@ -26,7 +29,7 @@ namespace stan {
     };
 
     template<typename T>
-    struct distributed_apply : public mpi_command {
+    struct mpi_distributed_apply : public mpi_command {
       friend class boost::serialization::access;
       template<class Archive>
       void serialize(Archive & ar, const unsigned int version) {
@@ -36,6 +39,41 @@ namespace stan {
         T::distributed_apply();
       }
     };
+
+    template<typename T>
+    void mpi_broadcast_command() {
+      boost::mpi::communicator world;
+
+      if(world.rank() != 0)
+        throw std::runtime_error("only root may broadcast commands.");
+
+      // used to lock the mpi cluster during execution of some
+      // distributed task
+      static std::mutex mpi_cluster_mutex;
+      std::lock_guard<std::mutex> lock_cluster(mpi_cluster_mutex);
+      
+      boost::shared_ptr<mpi_command> command(new T);
+      
+      boost::mpi::broadcast(world, command, 0);
+    }
+
+    // map N chunks to W with a chunks-size of C; used for
+    // deterministic scheduling
+    std::vector<int>
+    mpi_map_chunks(std::size_t N, std::size_t C = 1) {
+      boost::mpi::communicator world;
+      const std::size_t W = world.size();
+        
+      std::vector<int> chunks(W, N / W);
+      
+      for(std::size_t r = 0; r != N % W; r++)
+        ++chunks[r+1];
+
+      for(std::size_t i = 0; i != W; i++)
+        chunks[i] *= C;
+
+      return(chunks);
+    }
 
     struct mpi_cluster {
       boost::mpi::communicator world_;
@@ -58,45 +96,16 @@ namespace stan {
         // the destructor will ensure that the childs are being
         // shutdown
         if(R_ == 0) {
-          broadcast_command<stop_worker>();
+          mpi_broadcast_command<mpi_stop_worker>();
         }
       }
 
-      template<typename T>
-      static void broadcast_command() {
-        boost::mpi::communicator world;
-        if(world.rank() != 0)
-          throw std::runtime_error("only root may broadcast commands.");
-
-          boost::shared_ptr<mpi_command> command(new T);
-
-          boost::mpi::broadcast(world, command, 0);
-      }
-
-      // map N chunks to W with a chunks-size of C; used for
-      // deterministic scheduling
-      static
-      std::vector<int>
-      map_chunks(std::size_t N, std::size_t C = 1) {
-        boost::mpi::communicator world;
-        const std::size_t W = world.size();
-        
-        std::vector<int> chunks(W, N / W);
-      
-        for(std::size_t r = 0; r != N % W; r++)
-          ++chunks[r+1];
-
-        for(std::size_t i = 0; i != W; i++)
-          chunks[i] *= C;
-
-        return(chunks);
-      }
 
     };
 
   }
 }
 
-BOOST_CLASS_EXPORT(stan::math::stop_worker)
-BOOST_CLASS_TRACKING(stan::math::stop_worker,track_never)
-BOOST_SERIALIZATION_FACTORY_0(stan::math::stop_worker)
+BOOST_CLASS_EXPORT(stan::math::mpi_stop_worker)
+BOOST_CLASS_TRACKING(stan::math::mpi_stop_worker,track_never)
+BOOST_SERIALIZATION_FACTORY_0(stan::math::mpi_stop_worker)

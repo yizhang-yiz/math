@@ -14,7 +14,7 @@ namespace stan {
   namespace math {
 
     namespace internal {
-            
+      
       template <typename F>
       class distributed_map_rect_lpdf {
         boost::mpi::communicator world_;
@@ -64,7 +64,7 @@ namespace stan {
           //std::cout << "root uses UID = " << uid_ << std::endl;
 
           // make childs aware of upcoming job
-          mpi_cluster::broadcast_command<stan::math::distributed_apply<distributed_map_rect_lpdf<F> > >();
+          mpi_broadcast_command<stan::math::mpi_distributed_apply<distributed_map_rect_lpdf<F> > >();
 
           //std::cout << "setting up root with uid = " << uid << std::endl;
           setup(uid);
@@ -182,7 +182,7 @@ namespace stan {
           boost::mpi::reduce(world_, local_result_sum.data(), local_result_sum.size(), final_result_, std::plus<double>(), 0);
 
           // next we collect the remaining individual partials
-          vector<int> chunks_result = mpi_cluster::map_chunks(N_, T_);
+          vector<int> chunks_result = mpi_map_chunks(N_, T_);
           boost::mpi::gatherv(world_, local_result.data(), local_result.size(), final_result_ + 1 + E_, chunks_result, 0);
 
           // now we can throw on the root if necessary as all workers have finished
@@ -256,7 +256,7 @@ namespace stan {
               world_theta.insert(world_theta.end(), theta_n_d.begin(), theta_n_d.end());
             }
           
-            const std::vector<int> chunks_theta = mpi_cluster::map_chunks(N_, T_);
+            const std::vector<int> chunks_theta = mpi_map_chunks(N_, T_);
             local_theta_.resize(chunks_theta[R_]);
             boost::mpi::scatterv(world_, world_theta.data(), chunks_theta, local_theta_.data(), 0);
             //std::cout << "Job " << R_ << " got " <<
@@ -273,7 +273,7 @@ namespace stan {
           // copy over sizes, etc.
           N_ = local_.N_;
 
-          chunks_ = mpi_cluster::map_chunks(N_, 1);
+          chunks_ = mpi_map_chunks(N_, 1);
           C_ = chunks_[R_];
 
           //std::cout << "worker " << world_.rank() << " / " << W_ << " got shapes " << N_ << ", " << T_ << ", " << X_i_ << ", " << X_r_ << std::endl;
