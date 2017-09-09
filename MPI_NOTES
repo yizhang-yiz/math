@@ -1,4 +1,8 @@
 
+WARNING: Boost MPI is BROKEN in 1.64.0; I used 1.65.1, but 1.65.0
+seems to be OK as well, see here:
+https://svn.boost.org/trac10/ticket/12723
+
 Build boost serialization and boost mpi as shared libraries
 
 ./b2 --prefix=$HOME/local --with-mpi --with-serialization -j4 install

@@ -1,9 +1,6 @@
+// only if STAN_HAS_MPI is defined during compilation, then MPI code is used
+
 #include <stan/math.hpp>
-#include <stan/math/prim/arr/functor/mpi_command.hpp>
-#include <stan/math/prim/arr/functor/mpi_cluster.hpp>
-#include <stan/math/rev/arr/functor/map_rect_mpi.hpp>
-#include <boost/mpi.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include <iostream>
 
@@ -24,19 +21,24 @@ struct hard_work {
   }
 };
 
+#ifdef STAN_HAS_MPI
 
 BOOST_CLASS_EXPORT(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >);
 BOOST_CLASS_TRACKING(stan::math::mpi_distributed_apply<stan::math::internal::distributed_map_rect<hard_work> >,track_never);
 
+#endif
+
 
 int main(int argc, const char* argv[]) {
+#ifdef STAN_HAS_MPI
   boost::mpi::environment env;
-  boost::mpi::communicator world;
-  using std::vector;
   
   // on non-root processes this makes the workers listen to commands
   // send from the root
   stan::math::mpi_cluster cluster;
+#endif
+  
+  using std::vector;
 
   std::cout << "Root process starts distributing work..." << std::endl;
 
@@ -62,17 +64,17 @@ int main(int argc, const char* argv[]) {
   std::cout << "Distributing the data to the nodes..." << std::endl;
   
   const std::size_t uid = 0;
-  vector<stan::math::var> res = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
+  vector<stan::math::var> res = stan::math::map_rect<hard_work>(eta, theta, x_r, x_i, uid);
 
   for(std::size_t i = 0; i != N; i++)
     std::cout << "res[" << i << "] = " << res[i] << std::endl;
   
   std::cout << "Executing with cached data for uid = " << uid << std::endl;
 
-  vector<stan::math::var> res2 = stan::math::map_rect_mpi<hard_work>(eta, theta, x_r, x_i, uid);
+  vector<stan::math::var> res2 = stan::math::map_rect<hard_work>(eta, theta, x_r, x_i, uid);
 
   std::cout << "run things as double only locally..." << std::endl;
-  vector<double> res3 = stan::math::map_rect_mpi<hard_work>(eta_d, theta_d, x_r, x_i, uid);
+  vector<double> res3 = stan::math::map_rect<hard_work>(eta_d, theta_d, x_r, x_i, uid);
 
   std::cout << "Root process ends." << std::endl;
   

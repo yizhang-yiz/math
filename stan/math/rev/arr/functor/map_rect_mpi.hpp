@@ -5,7 +5,7 @@
 
 #include <stan/math/prim/mat/fun/to_array_1d.hpp>
 #include <stan/math/prim/arr/functor/mpi_command.hpp>
-#include <stan/math/prim/arr/functor/map_rect_mpi.hpp>
+#include <stan/math/prim/arr/functor/mpi_cluster.hpp>
 
 namespace stan {
   namespace math {
