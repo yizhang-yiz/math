@@ -119,13 +119,13 @@ namespace stan {
 
           // holds accumulated terms: function output and summed
           // partials of shared parameters
-          vector<double> local_result_sum(1+E_,0);
+          //vector<double> local_result_sum(1+E_,0);
           
-          // holds partials of per job parameters
-          vector<double> local_result; 
+          // holds partials of per job parameters and the summed values on this host
+          vector<double> local_result(1+E_,0); 
           
           // reserve output size
-          local_result.reserve(C_*T_);
+          local_result.reserve(1+E_+C_*T_);
 
           bool all_ok = true;
 
@@ -149,9 +149,9 @@ namespace stan {
               
               fx_v.grad(z_vars, grad);
 
-              local_result_sum[0] += fx_v.val();
+              local_result[0] += fx_v.val();
               for (std::size_t j = 0; j != E_; ++j) {
-                local_result_sum[1+j] += grad[j];
+                local_result[1+j] += grad[j];
               }
 
               local_result.insert(local_result.end(), grad.begin() + E_, grad.end());
@@ -167,15 +167,18 @@ namespace stan {
           }
           // collect results at root
 
-          // we only allocate any memory on the root
-          if(R_ == 0) {
-            // allocate memory on AD stack for final result. Note that the
-            // gradients and the function results will land there
-            final_result_
-              = ChainableStack::memalloc_.alloc_array<double>( 1 + E_ + N_ * T_ );
+          vector<int> chunks_result = mpi_map_chunks(N_, T_);
+          int world_size = 0;
+          for(std::size_t i=0; i != W_; i++) {
+            chunks_result[i] += 1+E_;
+            world_size += chunks_result[i];
           }
+          // we only allocate any memory on the root
+          std::vector<double> world_temp(world_size); // holds all results on root
+          // which still need some
+          // accumulation
 
-
+          /* mpi reduce appears to cause lots of latency, avoid
           // collect results, first call a MPI reduce on the results
           // which are directly accumulated
           //std::cout << "gathering actual outputs..." << std::endl;
@@ -184,6 +187,29 @@ namespace stan {
           // next we collect the remaining individual partials
           vector<int> chunks_result = mpi_map_chunks(N_, T_);
           boost::mpi::gatherv(world_, local_result.data(), local_result.size(), final_result_ + 1 + E_, chunks_result, 0);
+          */
+
+          // next we collect the remaining individual partials
+          boost::mpi::gatherv(world_, local_result.data(), local_result.size(), world_temp.data(), chunks_result, 0);
+
+          if(R_ == 0) {
+            // finish on root accumulation and put results onto right place
+            // allocate memory on AD stack for final result. Note that the
+            // gradients and the function results will land there
+            final_result_
+              = ChainableStack::memalloc_.alloc_array<double>( 1 + E_ + N_ * T_ );
+            std::fill_n(final_result_, 1+E_, 0);
+            std::size_t p = 0; // gets increased by the chunk size from each node
+            std::size_t t = 0; // counts number of partials already processes
+            for(std::size_t i=0; i != W_; i++) {
+              for(std::size_t j=0; j != 1+E_; j++)
+                final_result_[j] += world_temp[p+j];
+              std::size_t tc = chunks_result[i] - 1 - E_; // # of partials from this chunk
+              std::copy_n(world_temp.begin() + p + 1 + E_, tc, final_result_ + 1 + E_ + t);
+              t += tc;
+              p += chunks_result[i];
+            }
+          }
 
           // now we can throw on the root if necessary as all workers have finished
           if(unlikely(R_ == 0 & !all_ok))
