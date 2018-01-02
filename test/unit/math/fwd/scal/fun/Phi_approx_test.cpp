@@ -3,16 +3,16 @@
 // Phi_approx needs inv_logit in order for this to work
 #include <test/unit/math/fwd/scal/fun/nan_util.hpp>
 
-TEST(AgradFwdPhi_approx,Fvar) {
+TEST(AgradFwdPhi_approx, Fvar) {
   using stan::math::fvar;
   using stan::math::Phi_approx;
   fvar<double> x = 1.0;
   x.d_ = 1.0;
-  
+
   fvar<double> Phi_approx_x = Phi_approx(x);
 
   EXPECT_FLOAT_EQ(Phi_approx(1.0), Phi_approx_x.val_);
-  EXPECT_FLOAT_EQ(0.24152729,Phi_approx_x.d_);
+  EXPECT_FLOAT_EQ(0.24152729, Phi_approx_x.d_);
 }
 TEST(AgradFwdPhi_approx, FvarDerivUnderOverFlow) {
   using stan::math::fvar;
@@ -57,13 +57,12 @@ TEST(AgradFwdPhi_approx, FvarFvarDouble) {
 
 struct Phi_approx_fun {
   template <typename T0>
-  inline T0
-  operator()(const T0& arg1) const {
+  inline T0 operator()(const T0& arg1) const {
     return stan::math::Phi_approx(arg1);
   }
 };
 
-TEST(AgradFwdPhi_approx,Phi_approx_NaN) {
+TEST(AgradFwdPhi_approx, Phi_approx_NaN) {
   Phi_approx_fun Phi_approx_;
-  test_nan_fwd(Phi_approx_,false);
+  test_nan_fwd(Phi_approx_, false);
 }

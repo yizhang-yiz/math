@@ -102,7 +102,7 @@ TEST(AgradFwdAcosh, FvarFvarVar_2ndDeriv) {
   b.d_.val_.grad(q, r);
   EXPECT_FLOAT_EQ(2.0 * -1.07331265, r[0]);
 }
-TEST(AgradFwdAcosh,FvarFvarVar_3rdDeriv) {
+TEST(AgradFwdAcosh, FvarFvarVar_3rdDeriv) {
   using stan::math::fvar;
   using stan::math::var;
   using stan::math::acosh;
@@ -122,8 +122,7 @@ TEST(AgradFwdAcosh,FvarFvarVar_3rdDeriv) {
 
 struct acosh_fun {
   template <typename T0>
-  inline T0
-  operator()(const T0& arg1) const {
+  inline T0 operator()(const T0& arg1) const {
     return acosh(arg1);
   }
 };
