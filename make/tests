@@ -12,6 +12,7 @@ GTEST_CXXFLAGS += -isystem $(GTEST)/include -isystem $(GTEST) -O$O
 $(GTEST)/src/gtest-all.o: CXXFLAGS += $(GTEST_CXXFLAGS)
 
 test/%$(EXE) : CXXFLAGS += $(GTEST_CXXFLAGS)
+<<<<<<< HEAD
 test/%$(EXE) : test/%.o $(GTEST_MAIN) $(GTEST)/src/gtest-all.o $(LIBMPI)
 	$(LINK.cpp) -o $@ $^ $(LDFLAGS_OPENCL) $(LDFLAGS_MPI)
 
@@ -26,6 +27,17 @@ test/%.d : test/%.cpp
 	$(COMPILE.cpp) $< -MM > $@.$$$$; \
 	sed -e 's,\($(*F)\)\.o[ :]*,$(@D)/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
+=======
+test/%$(EXE) : test/%.o $(GTEST_MAIN) $(GTEST)/src/gtest-all.o
+	$(LINK.cpp) ${PCC_LINKER_FLAGS_FIX} -o $@ $^
+
+# test/petsc_%$(EXE) : test/petsc_%.o $(GTEST_MAIN) $(GTEST)/src/gtest-all.o
+# 	$(LINK.cpp) ${PCC_LINKER_FLAGS} -o $@ $^
+
+OUTPUT_OPTION=-MMD -MP -o $@	# auto dependencies
+test/%.o : test/%.cpp
+	${COMPILE.cpp} $(OUTPUT_OPTION) -c $<
+>>>>>>> dot_product_petsc
 
 ##
 # Adding a test for multiple translation units. If this fails,
@@ -64,6 +76,9 @@ $(IDAS_TESTS) : $(LIBSUNDIALS)
 
 OPENCL_TESTS := $(subst .cpp,$(EXE),$(shell find test -name *opencl*_test.cpp))
 $(OPENCL_TESTS) : LDFLAGS += $(LDFLAGS_OPENCL)
+
+# petsc tests
+# PETSC_MATH_TEST := $(subst .cpp,$(EXE),$(shell find test -name *petsc*_test.cpp))
 
 ############################################################
 #
