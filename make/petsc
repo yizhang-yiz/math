@@ -1,0 +1,31 @@
+# ALL: ex1
+# CFLAGS     =
+# FFLAGS     =
+# CPPFLAGS   =
+# FPPFLAGS   =
+CLEANFILES = ex1
+
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+
+CXXFLAGS += ${CXX_FLAGS}	# add petsc flags
+CXXFLAGS += ${CCPPFLAGS}	# add petsc flags
+
+debug0:
+	echo ${CCPPFLAGS}
+
+# debug: Why Did File foo Get Built?
+# OLD_SHELL := $(SHELL)
+# SHELL = $(warning [$@ ($^) ($?)])$(OLD_SHELL)
+
+STAN_PETSC_HEADERS := $(shell find stan -name *petsc*.hpp)
+$(STAN_PETSC_HEADERS) : ${PETSC_LIB}
+
+%_petsc.o: %_petsc.c
+	${COMPILE.cpp} -c $< -o $@
+%_petsc: %_petsc.o
+	$(LINK.cpp) ${PCC_LINKER_FLAGS} -o $@ $< ${PETSC_LIB}
+	${RM} $<
+
+
+

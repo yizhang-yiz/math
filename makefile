@@ -14,11 +14,13 @@ include make/default_compiler_options
 ##
 MATH ?=
 include make/libraries
+include make/petsc  # petsc
 
 -include $(HOME)/.config/stan/make.local  # define local variables
 -include make/local                       # overwrite local variables
 
-CXX = $(CC)
+# mpicxx
+# CXX = 
 
 ##
 # Get information about the compiler used.
@@ -142,7 +144,7 @@ doxygen:
 # Clean up.
 ##
 .PHONY: clean clean-doxygen clean-deps clean-all
-clean:
+allclean:
 	@echo '  removing test executables'
 	$(shell find test -type f -name "*_test$(EXE)" -exec rm {} +)
 	$(shell find test -type f -name "*_test.d" -exec rm {} +)
