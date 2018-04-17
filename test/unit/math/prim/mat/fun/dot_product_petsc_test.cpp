@@ -1,3 +1,4 @@
+#include <stan/math/prim/mat/fun/to_vec_petsc.hpp>
 #include <stan/math/prim/mat/fun/dot_product_petsc.hpp>
 #include <stan/math/prim/mat.hpp>
 #include <gtest/gtest.h>
@@ -24,12 +25,12 @@ TEST(MathMatrix, dot_product_petsc) {
   using stan::math::dot_product_petsc;
   using stan::math::dot_product_eigen;
 
-  VectorXd v1 = VectorXd::Random(8000000,1);
-  VectorXd v2 = VectorXd::Random(8000000,1);
+  VectorXd v1 = VectorXd::Random(29,1);
+  VectorXd v2 = VectorXd::Random(29,1);
+
   auto res1 = dot_product_eigen(v1, v2);
   auto res2 = dot_product_petsc(v1, v2);
 
-  std::cout << "eigen result: " << res1 << "\n";
-  std::cout << "petsc result: " << res2 << "\n";
+  EXPECT_FLOAT_EQ(res1, res2);
 
 }

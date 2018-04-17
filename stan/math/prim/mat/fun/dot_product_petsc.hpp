@@ -1,11 +1,13 @@
 #ifndef STAN_MATH_PRIM_MAT_FUN_DOT_PRODUCT_HPP
 #define STAN_MATH_PRIM_MAT_FUN_DOT_PRODUCT_HPP
 
+#include <stan/math/prim/mat/fun/to_vec_petsc.hpp>
 #include <stan/math/prim/mat/fun/Eigen.hpp>
 #include <stan/math/prim/mat/err/check_vector.hpp>
 #include <stan/math/prim/arr/err/check_matching_sizes.hpp>
 #include <petscvec.h>
 #include <vector>
+
 
 #include <chrono>
 #include <iostream>
@@ -32,41 +34,27 @@ inline double dot_product_eigen(const Eigen::VectorXd& v1,
   auto res = v1.dot(v2);
   auto end = std::chrono::system_clock::now();
   elapsed_seconds = end - start;
-  std::cout << "elapsed time(dot_product_eigen): " << elapsed_seconds.count() << "\n";
-  return res;
+   return res;
 }
   
 inline double dot_product_petsc(const Eigen::VectorXd& v1,
                                 const Eigen::VectorXd& v2) {
   PetscErrorCode ierr;
-  PetscInt       i, n=1000000, rank, size;
   Vec            vv1, vv2;
   PetscScalar    res;
   std::chrono::duration<double> elapsed_seconds;
   ierr = PetscInitialize(0, NULL,(char*)0,"");if (ierr) return ierr;
-  ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank);CHKERRQ(ierr);
-  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size);CHKERRQ(ierr);
-  ierr = VecCreate(PETSC_COMM_WORLD,&vv1);CHKERRQ(ierr); ierr = VecSetSizes(vv1,PETSC_DECIDE,n*size);CHKERRQ(ierr); ierr = VecSetFromOptions(vv1);CHKERRQ(ierr);
-  ierr = VecCreate(PETSC_COMM_WORLD,&vv2);CHKERRQ(ierr); ierr = VecSetSizes(vv2,PETSC_DECIDE,n*size);CHKERRQ(ierr); ierr = VecSetFromOptions(vv2);CHKERRQ(ierr);
 
-  for (i=n*rank; i<n*(rank+1); i++) {
-    ierr  = VecSetValues(vv1,1,&i,&v1[i],INSERT_VALUES);CHKERRQ(ierr);
-    ierr  = VecSetValues(vv2,1,&i,&v2[i],INSERT_VALUES);CHKERRQ(ierr);
-  }
-  ierr = VecAssemblyBegin(vv1);CHKERRQ(ierr); ierr = VecAssemblyEnd(vv1);CHKERRQ(ierr);
-  ierr = VecAssemblyBegin(vv2);CHKERRQ(ierr); ierr = VecAssemblyEnd(vv2);CHKERRQ(ierr);
-
+  to_vec_petsc(v1, PETSC_COMM_WORLD, &vv1);CHKERRQ(ierr);
+  to_vec_petsc(v2, PETSC_COMM_WORLD, &vv2);CHKERRQ(ierr);
+  
   // ierr = VecView(vv2,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
-  auto start = std::chrono::system_clock::now();
-  ierr = VecDot(vv1, vv2, &res);CHKERRQ(ierr);
-  auto end = std::chrono::system_clock::now();
-  elapsed_seconds = end - start;
-  std::cout << "elapsed time(dot_product_petsc): " << elapsed_seconds.count() << "\n";
+  ierr = VecDot(vv1, vv2, &res);CHKERRQ(ierr);CHKERRQ(ierr);
 
-  ierr = VecDestroy(&vv1);CHKERRQ(ierr);
-  ierr = VecDestroy(&vv2);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = VecDestroy(&vv1);CHKERRQ(ierr);CHKERRQ(ierr);
+  ierr = VecDestroy(&vv2);CHKERRQ(ierr);CHKERRQ(ierr);
+  ierr = PetscFinalize();CHKERRQ(ierr);
 
   return res;
 
