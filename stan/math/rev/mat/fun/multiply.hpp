@@ -428,6 +428,8 @@ class multiply_mat_vari<Ta, Ra, Ca, double, Cb> : public vari {
     }
     MatrixXd AB = Map<MatrixXd>(Ad_, A_rows_, A_cols_)
                   * Map<MatrixXd>(Bd_, A_cols_, B_cols_);
+    std::cout << "AB size: " << AB.size() << "\n";
+    std::cout << "AB(0): " << AB(0) << "\n";
     for (size_type i = 0; i < AB.size(); ++i)
       variRefAB_[i] = new vari(AB.coeffRef(i), false);
   }
@@ -443,6 +445,9 @@ class multiply_mat_vari<Ta, Ra, Ca, double, Cb> : public vari {
     adjA = adjAB * Map<MatrixXd>(Bd_, A_cols_, B_cols_).transpose();
     for (size_type i = 0; i < A_size_; ++i)
       variRefA_[i]->adj_ += adjA(i);
+
+    // seg fault
+    Eigen::Matrix<stan::math::var, -1, -1> A_temp=Eigen::Matrix<stan::math::var, -1, -1>::Random(1, 1);
   }
 };
 
