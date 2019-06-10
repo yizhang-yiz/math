@@ -48,13 +48,13 @@ TEST(ito_process_euler_test, linear_1d) {
   -0.990680249, -1.982484822,  0.055027686, -0.783264035,  0.793723338,
   -0.275728723,  1.267190326, -0.500147232, -1.001674061,  1.287339032;
 
-  const std::vector<double> lambda{2.0};
-  const std::vector<double> mu{1.0};
+  const std::vector<double> mu{2.0};
+  const std::vector<double> sigma{1.0};
   Eigen::Matrix<double, -1, 1> y0(1);
   y0 << 1.0;
   
   const double t_end = 0.1;
-  Eigen::MatrixXd y = ito_process_euler(f1, f2, y0, step_normal, lambda, mu, t_end);
+  Eigen::MatrixXd y = ito_process_euler(f1, f2, y0, step_normal, mu, sigma, t_end);
 
   // exact solution
   const double h = t_end / double(n);
@@ -63,7 +63,7 @@ TEST(ito_process_euler_test, linear_1d) {
   double wiener = 0.0;
   for (int i = 0; i < n; ++i) {
     wiener += sqrt(h) * step_normal(i);
-    y_exact = y0[0] * stan::math::exp((lambda[0] - 0.5 * mu[0] * mu[0] ) * i * h + mu[0] * wiener);
+    y_exact = y0[0] * stan::math::exp((mu[0] - 0.5 * sigma[0] * sigma[0] ) * i * h + sigma[0] * wiener);
     EXPECT_NEAR(y(i), y_exact, 7.5e-3);
   }
 }
