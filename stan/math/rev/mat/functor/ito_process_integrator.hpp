@@ -8,11 +8,16 @@ namespace stan {
 namespace math {
 
   /*
-   * Tamed Euler scheme from
+   * Stepper for tamed Euler scheme, based on
    *
    * Hutzenthaler, M., Jentzen, A., and Kloeden, P. E. Strong convergence of an explicit
    * numerical method for SDEs with non-globally Lipschitz continuous coefficients. Ann. Appl.
    * Probab. 22, 4 (2012), 1611–1641.
+   *
+   * @tparam F1 functor type for autonomous drift function mu
+   * @tparam F2 functor type for autonomous diffusion delta
+   * @tparam T1 type of the parameters that @c F1 depends on
+   * @tparam T2 type of the parameters that @c F2 depends on
    *
    */
   template<typename F1, typename F2, typename T1, typename T2>
@@ -24,12 +29,35 @@ namespace math {
 
     using param_t = typename stan::return_type<T1, T2>::type;
 
+    /*
+     * Constructor
+     *
+     * @param f1_in drift function
+     * @param f2_in diffusion function
+     * @param theta1_in drift function parameters
+     * @param theta2_in diffusion function parameters
+     */
     ito_process_tamed_euler_stepper(const F1& f1_in, const F2& f2_in,
                                     const std::vector<T1>& theta1_in,
                                     const std::vector<T2>& theta2_in) :
       f1(f1_in), f2(f2_in), theta1(theta1_in), theta2(theta2_in)
     {}
 
+    /*
+     * stepping operation that move forward one time step
+     * with size @c h, returning numerical solution at that step.
+     *
+     * @tparam T0 current solution type.
+     * @tparam Tw type for iid R.Vs with standard normal
+     *            distribution that serve each step of the Wiener
+     *            process is based upon.
+     * @param h time step size
+     * @param y current numerical solution
+     * @param w vector of values from iid random variables
+     *          with normal distribution. For such a value @c w, 
+     *          Wiener process increment is calculated as @c sqrt(h)*w.
+     * @return numerical solution at next time step.
+     */
     template<typename T0, typename Tw>
     inline Eigen::Matrix<typename stan::return_type<T0, Tw, param_t>::type, -1, 1>
     operator()(double h,
@@ -38,19 +66,38 @@ namespace math {
       using drift_t = typename stan::return_type<T0, T1>::type;
       using diffu_t = typename stan::return_type<T0, Tw, T2>::type;
       const Eigen::Matrix<drift_t, -1, 1> drift = f1(y, theta1);
-      const Eigen::Matrix<diffu_t, -1, 1> diffu = f2(y, theta2) * sqrt(h) * w;
+      const Eigen::Matrix<diffu_t, -1, 1> diffu = sqrt(h) * f2(y, theta2) * w;
       return y + h * drift / (1.0 + h * stan::math::sqrt(drift.squaredNorm())) + diffu;
     }
   };
 
 
+  /*
+   * Generation of an Ito process as numerical solution of SDEs.
+   */
   struct ito_process {
-
+    /*
+     * default constructor.
+     */
     ito_process() {}
 
     /*
-     * Apply stepper @c S to a constant step size, given
+     * Apply stepper @c S to a sequence with constant step size, given
      * initial condition @c y0 and Wiener process @c w.
+     *
+     * @tparam T0 type of initial condition
+     * @tparam Tw type for iid R.Vs with standard normal
+     *            distribution that serve each step of the Wiener
+     *            process is based upon. 
+     *
+     * @param stepper numerical stepper.
+     * @param y0 initial condition.
+     * @param w Matrix of iid R.Vs for Wiener process, with
+     *          size nr x nc, and the number of cols(nc)
+     *          defines the number of points of the process to be returned.
+     * @param t final time to be reached through @c stepper.
+     * @return solution matrix with size nr x nc.
+     *         Solution i, i=0...nc-1 is at time @c t/nc*(i+1).
      */
     template<typename T0, typename Tw, typename S>
     inline Eigen::Matrix<typename stan::return_type<T0, Tw, typename S::param_t>::type, -1, -1>
@@ -63,7 +110,7 @@ namespace math {
       Eigen::Matrix<scalar_t, -1, -1> res(y0.size(), w.cols());
       int n = w.cols();
       const double h = t / n;
-      Eigen::Matrix<T0, -1, 1> yv;
+      Eigen::Matrix<scalar_t, -1, 1> yv;
       Eigen::Matrix<Tw, -1, 1> wv = w.col(0);
       res.col(0) = stepper(h, y0, wv);
       for (int i = 1; i < n; ++i) {
@@ -76,6 +123,30 @@ namespace math {
     }
   };
 
+  /*
+   * Ito process by Euler scheme @c ito_process_tamed_euler_stepper
+   *
+   * @tparam F1 functor type for autonomous drift function mu.
+   * @tparam F2 functor type for autonomous diffusion delta.
+   * @tparam T0 current solution type.
+   * @tparam Tw type for iid R.Vs with standard normal
+   *            distribution that serve each step of the Wiener
+   *            process is based upon.
+   * @tparam T1 type of the parameters that @c F1 depends on.
+   * @tparam T2 type of the parameters that @c F2 depends on.
+   * @param f1 drift function
+   * @param f2 diffusion function, its return must be left-multiplicable
+   *           to @c w
+   * @param y0 initial condition.
+   * @param w Matrix of iid R.Vs for Wiener process, with
+   *          size nr x nc, and the number of cols(nc)
+   *          defines the number of points of the process to be returned.
+   * @param theta1 drift function parameters
+   * @param theta2 diffusion function parameters
+   * @param t final time to be reached through @c stepper.
+   * @return solution matrix with size nr x nc.
+   *         Solution i, i=0...nc-1 is at time @c t/nc*(i+1).
+   */
   template<typename F1, typename F2, typename T0, typename Tw, typename T1, typename T2>
   inline Eigen::Matrix<typename stan::return_type<T0, Tw, T1, T2>::type, -1, -1>  
   ito_process_euler(const F1& f1, const F2& f2,
