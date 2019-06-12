@@ -65,9 +65,10 @@ namespace math {
                const Eigen::Matrix<Tw, -1, 1>& w) const {
       using drift_t = typename stan::return_type<T0, T1>::type;
       using diffu_t = typename stan::return_type<T0, Tw, T2>::type;
-      const Eigen::Matrix<drift_t, -1, 1> drift = f1(y, theta1);
-      const Eigen::Matrix<diffu_t, -1, 1> diffu = sqrt(h) * f2(y, theta2) * w;
-      return y + h * drift / (1.0 + h * stan::math::sqrt(drift.squaredNorm())) + diffu;
+      const Eigen::Matrix<drift_t, -1,  1> drift = f1(y, theta1);
+      const Eigen::Matrix<drift_t, -1, -1> diffu = f2(y, theta2);
+      stan::math::check_size_match("Ito process", "diffusion", diffu.cols(), "standard normal", w.size());
+      return y + h * drift / (1.0 + h * stan::math::sqrt(drift.squaredNorm())) + sqrt(h) * diffu * w;
     }
   };
 
