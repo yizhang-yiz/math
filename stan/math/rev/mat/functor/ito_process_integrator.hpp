@@ -58,17 +58,18 @@ namespace math {
      *          Wiener process increment is calculated as @c sqrt(h)*w.
      * @return numerical solution at next time step.
      */
-    template<typename T0, typename Tw>
-    inline Eigen::Matrix<typename stan::return_type<T0, Tw, param_t>::type, -1, 1>
+    template<typename T0, typename Derived>
+    inline Eigen::Matrix<typename stan::return_type<T0, typename Derived::Scalar, param_t>::type, -1, 1> // NOLINT
     operator()(double h,
                const Eigen::Matrix<T0, -1, 1>& y,
-               const Eigen::Matrix<Tw, -1, 1>& w) const {
-      using drift_t = typename stan::return_type<T0, T1>::type;
-      using diffu_t = typename stan::return_type<T0, Tw, T2>::type;
-      const Eigen::Matrix<drift_t, -1,  1> drift = f1(y, theta1);
-      const Eigen::Matrix<drift_t, -1, -1> diffu = f2(y, theta2);
-      stan::math::check_size_match("Ito process", "diffusion", diffu.cols(), "standard normal", w.size());
-      return y + h * drift / (1.0 + h * stan::math::sqrt(drift.squaredNorm())) + sqrt(h) * diffu * w;
+               const Eigen::MatrixBase<Derived>& w) const {
+      const Eigen::Matrix<typename stan::return_type<T0, T1>::type, -1,  1> drift = f1(y, theta1); // NOLINT
+      const Eigen::Matrix<typename stan::return_type<T0, T2>::type, -1, -1> diffu = f2(y, theta2); // NOLINT
+      stan::math::check_size_match("Ito process", "diffusion", diffu.cols(), "standard normal", w.size()); // NOLINT
+      Eigen::Matrix<typename stan::return_type<T0, typename Derived::Scalar, param_t>::type, -1, 1> res(y); // NOLINT
+      res += h * drift / (1.0 + h * stan::math::sqrt(drift.squaredNorm()));
+      res += sqrt(h) * diffu * w;
+      return res;
     }
   };
 
@@ -111,13 +112,11 @@ namespace math {
       Eigen::Matrix<scalar_t, -1, -1> res(y0.size(), w.cols());
       int n = w.cols();
       const double h = t / n;
-      Eigen::Matrix<scalar_t, -1, 1> yv;
-      Eigen::Matrix<Tw, -1, 1> wv = w.col(0);
-      res.col(0) = stepper(h, y0, wv);
+      Eigen::Matrix<scalar_t, -1, 1> yv(y0.size());
+      res.col(0) = stepper(h, y0, w.col(0));
       for (int i = 1; i < n; ++i) {
         yv = res.col(i - 1);
-        wv = w.col(i);
-        res.col(i) = stepper(h, yv, wv);
+        res.col(i) = stepper(h, yv, w.col(i));
       }
 
       return res;
