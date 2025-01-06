@@ -1,13 +1,14 @@
 #ifndef STAN_MATH_FWD_FUN_MDIVIDE_LEFT_TRI_LOW_HPP
 #define STAN_MATH_FWD_FUN_MDIVIDE_LEFT_TRI_LOW_HPP
 
-#include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/Eigen.hpp>
-#include <stan/math/prim/fun/mdivide_left.hpp>
-#include <stan/math/fwd/fun/typedefs.hpp>
-#include <stan/math/fwd/fun/to_fvar.hpp>
-#include <stan/math/fwd/fun/multiply.hpp>
 #include <stan/math/fwd/core.hpp>
+#include <stan/math/fwd/fun/mdivide_left.hpp>
+#include <stan/math/fwd/fun/to_fvar.hpp>
+#include <stan/math/fwd/fun/typedefs.hpp>
+#include <stan/math/fwd/fun/multiply.hpp>
+#include <stan/math/prim/err.hpp>
+#include <stan/math/prim/fun/mdivide_left_tri_low.hpp>
 
 namespace stan {
 namespace math {
@@ -56,7 +57,6 @@ inline Eigen::Matrix<value_type_t<T2>, T1::RowsAtCompileTime,
                      T2::ColsAtCompileTime>
 mdivide_left_tri_low(const T1& A, const T2& b) {
   constexpr int S1 = T1::RowsAtCompileTime;
-  constexpr int C2 = T2::ColsAtCompileTime;
 
   check_square("mdivide_left_tri_low", "A", A);
   check_multiplicable("mdivide_left_tri_low", "A", A, "b", b);

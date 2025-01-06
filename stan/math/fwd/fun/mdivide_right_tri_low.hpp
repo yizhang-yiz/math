@@ -1,12 +1,13 @@
 #ifndef STAN_MATH_FWD_FUN_MDIVIDE_RIGHT_TRI_LOW_HPP
 #define STAN_MATH_FWD_FUN_MDIVIDE_RIGHT_TRI_LOW_HPP
 
-#include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/Eigen.hpp>
-#include <stan/math/prim/fun/mdivide_right.hpp>
-#include <stan/math/fwd/fun/to_fvar.hpp>
-#include <stan/math/fwd/fun/multiply.hpp>
 #include <stan/math/fwd/core.hpp>
+#include <stan/math/fwd/fun/mdivide_right.hpp>
+#include <stan/math/fwd/fun/multiply.hpp>
+#include <stan/math/fwd/fun/to_fvar.hpp>
+#include <stan/math/prim/err.hpp>
+#include <stan/math/prim/fun/mdivide_right_tri_low.hpp>
 
 namespace stan {
 namespace math {
@@ -98,7 +99,6 @@ inline Eigen::Matrix<value_type_t<EigMat2>, EigMat1::RowsAtCompileTime,
 mdivide_right_tri_low(const EigMat1& A, const EigMat2& b) {
   using T = typename value_type_t<EigMat2>::Scalar;
   constexpr int R1 = EigMat1::RowsAtCompileTime;
-  constexpr int C1 = EigMat1::ColsAtCompileTime;
   constexpr int R2 = EigMat2::RowsAtCompileTime;
   constexpr int C2 = EigMat2::ColsAtCompileTime;
   check_square("mdivide_right_tri_low", "b", b);

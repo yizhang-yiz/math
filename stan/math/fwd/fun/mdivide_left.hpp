@@ -1,13 +1,12 @@
 #ifndef STAN_MATH_FWD_FUN_MDIVIDE_LEFT_HPP
 #define STAN_MATH_FWD_FUN_MDIVIDE_LEFT_HPP
 
-#include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/Eigen.hpp>
-#include <stan/math/prim/fun/mdivide_left.hpp>
-#include <stan/math/prim/fun/multiply.hpp>
 #include <stan/math/fwd/core.hpp>
 #include <stan/math/fwd/fun/multiply.hpp>
 #include <stan/math/fwd/fun/to_fvar.hpp>
+#include <stan/math/prim/err.hpp>
+#include <stan/math/prim/fun/mdivide_left.hpp>
 #include <vector>
 
 namespace stan {
@@ -60,9 +59,6 @@ template <typename T1, typename T2,
 inline Eigen::Matrix<value_type_t<T2>, T1::RowsAtCompileTime,
                      T2::ColsAtCompileTime>
 mdivide_left(const T1& A, const T2& b) {
-  constexpr int S1 = T1::RowsAtCompileTime;
-  constexpr int C2 = T2::ColsAtCompileTime;
-
   check_square("mdivide_left", "A", A);
   check_multiplicable("mdivide_left", "A", A, "b", b);
   if (A.size() == 0) {

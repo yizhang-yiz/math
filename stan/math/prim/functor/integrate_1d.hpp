@@ -112,11 +112,10 @@ inline double integrate(const F& f, double a, double b,
       return Q;
     } else {
       boost::math::quadrature::tanh_sinh<double> integrator_right;
-      double Q
-          = integrator.integrate(f_wrap, a, 0.0, relative_tolerance, &error1,
-                                 &L1, &levels)
-            + integrator_right.integrate(f_wrap, 0.0, b, relative_tolerance,
-                                         &error2, &L2, &levels);
+      double Q = integrator.integrate(f_wrap, a, 0.0, relative_tolerance,
+                                      &error1, &L1, &levels)
+                 + integrator_right.integrate(
+                     f_wrap, 0.0, b, relative_tolerance, &error2, &L2, &levels);
       two_integral_convergence_check(error1, error2, relative_tolerance, L1,
                                      L2);
       return Q;
@@ -172,7 +171,7 @@ inline double integrate(const F& f, double a, double b,
  * @return numeric integral of function f
  */
 template <typename F, typename... Args,
-          require_all_not_st_var<Args...>* = nullptr>
+          require_all_st_arithmetic<Args...>* = nullptr>
 inline double integrate_1d_impl(const F& f, double a, double b,
                                 double relative_tolerance, std::ostream* msgs,
                                 const Args&... args) {

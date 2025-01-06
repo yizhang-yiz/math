@@ -24,10 +24,10 @@ TEST(MathPrimMat, vec_double_gp_matern32_cov1) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x[i], x[j])))
-              * std::exp(-1.0 * (pow(3.0, 0.5) / l)
-                         * stan::math::sqrt(
-                               stan::math::squared_distance(x[i], x[j]))),
+                           stan::math::squared_distance(x[i], x[j])))
+              * std::exp(
+                  -1.0 * (pow(3.0, 0.5) / l)
+                  * stan::math::sqrt(stan::math::squared_distance(x[i], x[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
 }
@@ -51,10 +51,10 @@ TEST(MathPrimMat, vec_eigen_gp_matern32_cov1) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x1[i], x1[j])))
+                           stan::math::squared_distance(x1[i], x1[j])))
               * std::exp(-1.0 * (pow(3.0, 0.5) / l)
                          * stan::math::sqrt(
-                               stan::math::squared_distance(x1[i], x1[j]))),
+                             stan::math::squared_distance(x1[i], x1[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
     }
@@ -84,10 +84,10 @@ TEST(MathPrimMat, vec_double_double_gp_matern32_cov1) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x1[i], x2[j])))
+                           stan::math::squared_distance(x1[i], x2[j])))
               * std::exp(-1.0 * (pow(3.0, 0.5) / l)
                          * stan::math::sqrt(
-                               stan::math::squared_distance(x1[i], x2[j]))),
+                             stan::math::squared_distance(x1[i], x2[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
 }
@@ -111,10 +111,10 @@ TEST(MathPrimMat, vec_eigen_gp_matern32_cov2) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x1[i], x1[j])))
+                           stan::math::squared_distance(x1[i], x1[j])))
               * std::exp(-1.0 * (pow(3.0, 0.5) / l)
                          * stan::math::sqrt(
-                               stan::math::squared_distance(x1[i], x1[j]))),
+                             stan::math::squared_distance(x1[i], x1[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
     }
@@ -146,10 +146,10 @@ TEST(MathPrimMat, vec_eigen_vec_eigen_gp_matern32_cov1) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x1[i], x2[j])))
+                           stan::math::squared_distance(x1[i], x2[j])))
               * std::exp(-1.0 * (pow(3.0, 0.5) / l)
                          * stan::math::sqrt(
-                               stan::math::squared_distance(x1[i], x2[j]))),
+                             stan::math::squared_distance(x1[i], x2[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
     }
@@ -163,10 +163,10 @@ TEST(MathPrimMat, vec_eigen_vec_eigen_gp_matern32_cov1) {
               * (1.0
                  + (pow(3.0, 0.5) / l)
                        * stan::math::sqrt(
-                             stan::math::squared_distance(x2[i], x1[j])))
+                           stan::math::squared_distance(x2[i], x1[j])))
               * std::exp(-1.0 * (pow(3.0, 0.5) / l)
                          * stan::math::sqrt(
-                               stan::math::squared_distance(x2[i], x1[j]))),
+                             stan::math::squared_distance(x2[i], x1[j]))),
           cov(i, j))
           << "index: (" << i << ", " << j << ")";
     }
@@ -542,4 +542,13 @@ TEST(MathPrimMat, check_dim_mismatch_gp_matern32_cov) {
 
   EXPECT_THROW(stan::math::gp_matern32_cov(x1, x2, sig, l),
                std::invalid_argument);
+}
+
+TEST(MathPrimMat, check_indexing_vector_vector_gp_matern32_cov) {
+  int p = 1;
+  int num_nodes = 10;
+  std::vector<Eigen::Matrix<double, -1, 1>> x(num_nodes,
+                                              stan::math::zeros_vector(p));
+  EXPECT_NO_THROW(
+      stan::math::gp_matern32_cov(x, 1.3, std::vector<double>{0.7}));
 }

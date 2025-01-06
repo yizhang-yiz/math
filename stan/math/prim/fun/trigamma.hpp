@@ -35,9 +35,6 @@ namespace math {
  */
 template <typename T>
 inline T trigamma_impl(const T& x) {
-  using std::floor;
-  using std::sin;
-
   double small = 0.0001;
   double large = 5.0;
   T value;
@@ -141,7 +138,7 @@ struct trigamma_fun {
    * @return trigamma applied to argument.
    */
   template <typename T>
-  static inline T fun(const T& x) {
+  static inline auto fun(const T& x) {
     return trigamma(x);
   }
 };

@@ -1,7 +1,6 @@
 #ifndef STAN_MATH_REV_FUN_LOG_HPP
 #define STAN_MATH_REV_FUN_LOG_HPP
 
-#include <stan/math/prim/fun/log.hpp>
 #include <stan/math/rev/meta.hpp>
 #include <stan/math/rev/core.hpp>
 #include <stan/math/rev/functor/apply_scalar_unary.hpp>
@@ -11,7 +10,9 @@
 #include <stan/math/rev/fun/cos.hpp>
 #include <stan/math/rev/fun/is_inf.hpp>
 #include <stan/math/rev/fun/is_nan.hpp>
+#include <stan/math/rev/fun/norm.hpp>
 #include <stan/math/rev/fun/sqrt.hpp>
+#include <stan/math/prim/fun/log.hpp>
 #include <cmath>
 
 namespace stan {

@@ -5,21 +5,19 @@
 
 template <typename T>
 void expect_arith_instantiate() {
-  using stan::math::pow;
-  using std::pow;
-  auto a1 = pow(T(1.0), 1);
-  auto b1 = pow(T(1.0), 1.0);
-  auto c1 = pow(1, T(1.0));
-  auto d1 = pow(1.0, T(1.0));
-  auto e1 = pow(T(1.0), T(1.0));
+  auto a1 = stan::math::pow(T(1.0), 1);
+  auto b1 = stan::math::pow(T(1.0), 1.0);
+  auto c1 = stan::math::pow(1, T(1.0));
+  auto d1 = stan::math::pow(1.0, T(1.0));
+  auto e1 = stan::math::pow(T(1.0), T(1.0));
 
-  auto a2 = pow(std::complex<T>(1.0), 1);
-  auto b2 = pow(std::complex<T>(1.0), 1.0);
-  auto c2 = pow(1, std::complex<T>(1.0));
-  auto d2 = pow(1.0, std::complex<T>(1.0));
-  auto e2 = pow(std::complex<T>(1.0), std::complex<T>(1.0));
-  auto f2 = pow(std::complex<double>(1.0), std::complex<T>(1.0));
-  auto g2 = pow(std::complex<T>(1.0), std::complex<double>(1.0));
+  auto a2 = stan::math::pow(std::complex<T>(1.0), 1);
+  auto b2 = stan::math::pow(std::complex<T>(1.0), 1.0);
+  auto c2 = stan::math::pow(1, std::complex<T>(1.0));
+  auto d2 = stan::math::pow(1.0, std::complex<T>(1.0));
+  auto e2 = stan::math::pow(std::complex<T>(1.0), std::complex<T>(1.0));
+  auto f2 = stan::math::pow(std::complex<double>(1.0), std::complex<T>(1.0));
+  auto g2 = stan::math::pow(std::complex<T>(1.0), std::complex<double>(1.0));
 }
 
 // this one's been tricky to instantiate, so test all instances
@@ -35,11 +33,9 @@ TEST(mathMixScalFun, powInstantiations) {
 }
 
 TEST(mathMixScalFun, pow) {
-  auto f = [](const auto& x1, const auto& x2) {
-    using stan::math::pow;
-    using std::pow;
-    return pow(x1, x2);
-  };
+  auto f
+      = [](const auto& x1, const auto& x2) { return stan::math::pow(x1, x2); };
+
   stan::test::expect_ad(f, -0.4, 0.5);
   stan::test::expect_ad(f, 0.5, 0.5);
   stan::test::expect_ad(f, 0.5, 1.0);
@@ -59,5 +55,9 @@ TEST(mathMixScalFun, pow) {
   in1 << 0.5, 3.4, 5.2;
   Eigen::VectorXd in2(3);
   in2 << 3.3, 0.9, 2.1;
+  stan::test::expect_ad(f, in1, in2);
+  stan::test::expect_ad(f, in1, 2.0);
+  stan::test::expect_ad(f, 2.0, in1);
+
   stan::test::expect_ad_vectorized_binary(f, in1, in2);
 }

@@ -7,14 +7,16 @@
 #include <stan/math/rev/fun/exp.hpp>
 #include <stan/math/rev/fun/fabs.hpp>
 #include <stan/math/rev/fun/floor.hpp>
-#include <stan/math/rev/fun/value_of_rec.hpp>
+#include <stan/math/rev/fun/hypergeometric_2F1.hpp>
 #include <stan/math/rev/fun/inc_beta.hpp>
 #include <stan/math/rev/fun/lgamma.hpp>
 #include <stan/math/rev/fun/log.hpp>
 #include <stan/math/rev/fun/log1m.hpp>
 #include <stan/math/rev/fun/value_of.hpp>
+#include <stan/math/rev/fun/value_of_rec.hpp>
 #include <stan/math/prim/fun/grad_2F1.hpp>
-#include <stan/math/prim/fun/value_of.hpp>
+#include <stan/math/prim/fun/grad_inc_beta.hpp>
+
 #include <cmath>
 
 namespace stan {
@@ -41,10 +43,13 @@ inline void grad_inc_beta(var& g1, var& g2, const var& a, const var& b,
   var C = exp(a * c1 + b * c2) / a;
   var dF1 = 0;
   var dF2 = 0;
-  if (value_of(value_of(C))) {
-    grad_2F1(dF1, dF2, a + b, var(1.0), a + 1, z);
+  var dF3 = 0;
+  var dFz = 0;
+  if (value_of_rec(C)) {
+    std::forward_as_tuple(dF1, dF2, dF3, dFz)
+        = grad_2F1<true>(a + b, var(1.0), a + 1, z);
   }
-  g1 = (c1 - 1.0 / a) * c3 + C * (dF1 + dF2);
+  g1 = (c1 - 1.0 / a) * c3 + C * (dF1 + dF3);
   g2 = c2 * c3 + C * dF1;
 }
 

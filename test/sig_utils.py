@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 if os.name == "nt":  # Windows
-    make = "mingw32-make"
+    make = "make"
     exe_extension = ".exe"
 else:
     make = "make"
@@ -17,6 +17,7 @@ arg_types = {
     "array[] int": "std::vector<int>",
     "array[,] int": "std::vector<std::vector<int>>",
     "real": "SCALAR",
+    "complex": "std::complex<SCALAR>",
     "array[] real": "std::vector<SCALAR>",
     "array[,] real": "std::vector<std::vector<SCALAR>>",
     "vector": "Eigen::Matrix<SCALAR, Eigen::Dynamic, 1>",
@@ -24,9 +25,15 @@ arg_types = {
     "row_vector": "Eigen::Matrix<SCALAR, 1, Eigen::Dynamic>",
     "array[] row_vector": "std::vector<Eigen::Matrix<SCALAR, 1, Eigen::Dynamic>>",
     "matrix": "Eigen::Matrix<SCALAR, Eigen::Dynamic, Eigen::Dynamic>",
+    "complex_vector": "Eigen::Matrix<std::complex<SCALAR>, Eigen::Dynamic, 1>",
+    "array[] complex_vector": "std::vector<Eigen::Matrix<std::complex<SCALAR>, Eigen::Dynamic, 1>>",
+    "complex_row_vector": "Eigen::Matrix<std::complex<SCALAR>, 1, Eigen::Dynamic>",
+    "array[] complex_row_vector": "std::vector<Eigen::Matrix<std::complex<SCALAR>, 1, Eigen::Dynamic>>",
+    "complex_matrix": "Eigen::Matrix<std::complex<SCALAR>, Eigen::Dynamic, Eigen::Dynamic>",
 }
 
 scalar_stan_types = ("int", "real", "rng", "ostream_ptr")
+
 
 def parse_array(stan_arg):
     """
@@ -38,6 +45,7 @@ def parse_array(stan_arg):
         commas, inner_type = stan_arg.lstrip("array[").split("]")
         return len(commas) + 1, inner_type.strip()
     return 0, stan_arg.strip()
+
 
 def get_cpp_type(stan_type):
     """
@@ -57,8 +65,8 @@ pos_definite = "positive_definite_matrix"
 scalar_return_type = "scalar_return_type"
 
 make_special_arg_values = {
-    simplex : "make_simplex",
-    pos_definite : "make_pos_definite_matrix"
+    simplex: "make_simplex",
+    pos_definite: "make_pos_definite_matrix",
 }
 
 # list of function arguments that need special scalar values.
@@ -67,36 +75,30 @@ special_arg_values = {
     "acosh": [1.4],
     "algebra_solver": [None, None, None, None, None, None, None, 10],
     "algebra_solver_newton": [None, None, None, None, None, None, None, 10],
+    "beta_neg_binomial_rng": [1.1, 3.1, 8.1],
     "log1m_exp": [-0.6],
-    "categorical_log": [None, simplex],
     "categorical_rng": [simplex, None],
     "categorical_lpmf": [None, simplex],
     "cholesky_decompose": [pos_definite, None],
     "csr_to_dense_matrix": [1, 1, None, [1], [1, 2]],
     "csr_matrix_times_vector": [1, 1, None, [1], [1, 2], None],
     "distance": [0.6, 0.4],
-    "dirichlet_log": [simplex, None],
     "dirichlet_lpdf": [simplex, None],
     "hmm_hidden_state_prob": [None, simplex, simplex],
     "hmm_latent_rng": [None, simplex, simplex, None],
     "hmm_marginal": [None, simplex, simplex],
     "lambert_wm1": [-0.3],
     "lkj_corr_lpdf": [1, None],
-    "lkj_corr_log": [1, None],
     "log_diff_exp": [3, None],
     "log_inv_logit_diff": [1.2, 0.4],
     "mdivide_left_spd": [pos_definite, None],
-    "multinomial_log": [None, simplex],
     "multinomial_lpmf": [None, simplex],
     "multinomial_rng": [simplex, None, None],
     "multi_normal_lpdf": [None, None, pos_definite],
-    "multi_normal_log": [None, None, pos_definite],
     "multi_normal_rng": [None, pos_definite],
     "multi_normal_prec_lpdf": [None, None, pos_definite],
-    "multi_normal_prec_log": [None, None, pos_definite],
     "multi_normal_prec_rng": [None, pos_definite],
     "multi_student_t_lpdf": [None, None, None, pos_definite],
-    "multi_student_t_log": [None, None, None, pos_definite],
     "multi_student_t_rng": [None, None, pos_definite],
     "ode_adams_tol": [None, None, 0.2, 0.4, None, None, 10, None, None, None],
     "ode_adams": [None, None, 0.2, 0.4, None, None, None],
@@ -110,41 +112,36 @@ special_arg_values = {
     "pareto_type_2_cdf": [1.5, 0.7, None, None],
     "pareto_type_2_cdf_log": [1.5, 0.7, None, None],
     "pareto_type_2_lcdf": [1.5, 0.7, None, None],
-    "positive_ordered_constrain" : [None, scalar_return_type],
+    "positive_ordered_constrain": [None, scalar_return_type],
     "positive_ordered_free": [1.0],
-    "ordered_constrain" : [None, scalar_return_type],
+    "ordered_constrain": [None, scalar_return_type],
     "ordered_free": [1.0],
-    "simplex_constrain" : [None, scalar_return_type],
+    "simplex_constrain": [None, scalar_return_type],
     "simplex_free": [simplex],
+    "std_normal_log_qf": [-0.1],
     "student_t_cdf": [0.8, None, 0.4, None],
     "student_t_cdf_log": [0.8, None, 0.4, None],
     "student_t_ccdf_log": [0.8, None, 0.4, None],
     "student_t_lccdf": [0.8, None, 0.4, None],
     "student_t_lcdf": [0.8, None, 0.4, None],
-    "unit_vector_constrain" : [None, scalar_return_type],
+    "unit_vector_constrain": [None, scalar_return_type],
     "unit_vector_free": [simplex],
     "uniform_cdf": [None, 0.2, 0.9],
     "uniform_ccdf_log": [None, 0.2, 0.9],
     "uniform_cdf_log": [None, 0.2, 0.9],
     "uniform_lccdf": [None, 0.2, 0.9],
     "uniform_lcdf": [None, 0.2, 0.9],
-    "uniform_log": [None, 0.2, 0.9],
     "uniform_lpdf": [None, 0.2, 0.9],
     "uniform_rng": [0.2, 1.9, None],
-    "wiener_log": [0.8, None, 0.4, None, None],
-    "wiener_lpdf": [0.8, None, 0.4, None, None],
+    "wiener_lpdf": [0.8, None, 0.4, None, None, None, None, None],
 }
 
 # list of functions we do not test. These are mainly functions implemented in compiler
 # (not in Stan Math).
 ignored = [
-    "lmultiply",
-    "assign_add",
-    "assign_divide",
-    "assign_elt_divide",
-    "assign_elt_times",
-    "assign_multiply",
-    "assign_subtract",
+    "lchoose", # synonym for binomial_coefficient_log
+    "lmultiply", # synonym for multiply_log
+    "std_normal_qf", # synonym for inv_Phi
     "if_else",
 ]
 
@@ -171,7 +168,7 @@ no_fwd_overload = [
     "ode_bdf_tol",
     "ode_rk45",
     "ode_rk45_tol",
-    "quantile"
+    "quantile",
 ]
 
 internal_signatures = [
@@ -279,7 +276,11 @@ def parse_signature(signature):
     function_name, rest = rest.split("(", 1)
     args = re.findall(r"(?:[(][^()]+[)][^,()]+)|(?:[^,()]+(?:,*[]][^,()]+)?)", rest)
     #  regex parts:        ^^^^^^functor^^^^^^     ^^^^any other arg^^^^^^^
-    args = [i.lstrip("data").strip() if "data" in i else i.strip() for i in args if i.strip()]
+    args = [
+        i.lstrip("data").strip() if "data" in i else i.strip()
+        for i in args
+        if i.strip()
+    ]
     return return_type.strip(), function_name.strip(), args
 
 
@@ -303,6 +304,7 @@ def handle_function_list(functions_input):
             function_names.append(f)
     return function_names, function_signatures
 
+
 def reference_vector_argument(arg):
     """
     Determines a reference argument, so as not to duplicate arrays of reals, vectors and row vectors,
@@ -313,6 +315,7 @@ def reference_vector_argument(arg):
     if arg in ("array[] real", "row_vector"):
         return "vector"
     return arg
+
 
 overload_scalar = {
     "Prim": "double",

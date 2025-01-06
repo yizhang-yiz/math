@@ -11,18 +11,32 @@ namespace math {
 
 /**
  * Returns a matrix with dynamic dimensions constructed from an
- * Eigen matrix which is either a row vector, column vector,
- * or matrix.
- * The runtime dimensions will be the same as the input.
+ * Eigen matrix.
  *
  * @tparam EigMat type of the matrix
  *
  * @param x matrix
  * @return the matrix representation of the input
  */
-template <typename EigMat, require_eigen_t<EigMat>* = nullptr>
+template <typename EigMat, require_eigen_dense_dynamic_t<EigMat>* = nullptr>
 inline EigMat to_matrix(EigMat&& x) {
   return std::forward<EigMat>(x);
+}
+
+/**
+ * Returns a matrix with dynamic dimensions constructed from an
+ * Eigen row or column vector.
+ * The runtime dimensions will be the same as the input.
+ *
+ * @tparam EigMat type of the vector/row vector
+ *
+ * @param matrix input vector/row vector
+ * @return the matrix representation of the input
+ */
+template <typename EigVec, require_eigen_vector_t<EigVec>* = nullptr>
+inline auto to_matrix(EigVec&& matrix) {
+  return Eigen::Matrix<value_type_t<EigVec>, Eigen::Dynamic, Eigen::Dynamic>(
+      std::forward<EigVec>(matrix));
 }
 
 /**
@@ -92,7 +106,7 @@ to_matrix(const std::vector<std::vector<T>>& x) {
 template <typename EigMat, require_eigen_t<EigMat>* = nullptr>
 inline Eigen::Matrix<value_type_t<EigMat>, Eigen::Dynamic, Eigen::Dynamic>
 to_matrix(EigMat&& x, int m, int n) {
-  static const char* function = "to_matrix(matrix)";
+  static constexpr const char* function = "to_matrix(matrix)";
   check_size_match(function, "rows * columns", m * n, "vector size", x.size());
   Eigen::Matrix<value_type_t<EigMat>, Eigen::Dynamic, Eigen::Dynamic> y
       = std::forward<EigMat>(x);
@@ -114,7 +128,7 @@ to_matrix(EigMat&& x, int m, int n) {
  */
 template <typename T>
 inline auto to_matrix(const std::vector<T>& x, int m, int n) {
-  static const char* function = "to_matrix(array)";
+  static constexpr const char* function = "to_matrix(array)";
   check_size_match(function, "rows * columns", m * n, "vector size", x.size());
   return Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>(
       &x[0], m, n);
@@ -133,7 +147,7 @@ inline auto to_matrix(const std::vector<T>& x, int m, int n) {
  */
 inline Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> to_matrix(
     const std::vector<int>& x, int m, int n) {
-  static const char* function = "to_matrix(array)";
+  static constexpr const char* function = "to_matrix(array)";
   int x_size = x.size();
   check_size_match(function, "rows * columns", m * n, "vector size", x_size);
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> result(m, n);

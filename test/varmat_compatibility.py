@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import itertools
 import json
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 import os
-import Queue
+import queue as Queue
 import subprocess
 import re
 import sys

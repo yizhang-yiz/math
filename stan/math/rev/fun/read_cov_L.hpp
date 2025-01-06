@@ -3,11 +3,11 @@
 
 #include <stan/math/prim/fun/Eigen.hpp>
 #include <stan/math/rev/core.hpp>
-#include <stan/math/prim/fun/log.hpp>
-#include <stan/math/prim/fun/read_cov_L.hpp>
+#include <stan/math/rev/fun/log.hpp>
 #include <stan/math/rev/fun/read_corr_L.hpp>
-#include <stan/math/prim/fun/sum.hpp>
+#include <stan/math/rev/fun/sum.hpp>
 #include <stan/math/prim/fun/constants.hpp>
+#include <stan/math/prim/fun/read_cov_L.hpp>
 
 namespace stan {
 namespace math {
@@ -39,7 +39,7 @@ inline auto read_cov_L(const T_CPCs& CPCs, const T_sds& sds,
   var_value<Eigen::MatrixXd> res
       = sds.val().matrix().asDiagonal() * corr_L.val();
 
-  reverse_pass_callback([CPCs, sds, corr_L, log_prob, res]() mutable {
+  reverse_pass_callback([sds, corr_L, log_prob, res]() mutable {
     size_t K = sds.size();
 
     corr_L.adj() += sds.val().matrix().asDiagonal() * res.adj();
